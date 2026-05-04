@@ -47,86 +47,19 @@ if not defined ACTIVE_PYTHON (
 )
 
 if not defined ACTIVE_PYTHON (
-    echo Searching common Python install locations...
-    for /d %%D in ("%LocalAppData%\Programs\Python\Python*" "%ProgramFiles%\Python*" "%ProgramFiles(x86)%\Python*") do (
-        if not defined ACTIVE_PYTHON if exist "%%~fD\python.exe" (
-            set "ACTIVE_PYTHON="%%~fD\python.exe""
-            set "ACTIVE_PYTHON_ARGS="
-            echo Using detected python.exe: %%~fD\python.exe
-        )
-    )
-)
-
-if not defined ACTIVE_PYTHON (
-    echo Checking Windows registry for Python 3.11 install path...
-    set "REGISTRY_PATH="
-    for /f "tokens=2,*" %%A in ('reg query "HKCU\Software\Python\PythonCore\3.11\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
-    if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
-        set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
-        set "ACTIVE_PYTHON_ARGS="
-        echo Using registry python.exe: !REGISTRY_PATH!python.exe
-    )
-)
-
-if not defined ACTIVE_PYTHON (
-    set "REGISTRY_PATH="
-    for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\Python\PythonCore\3.11\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
-    if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
-        set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
-        set "ACTIVE_PYTHON_ARGS="
-        echo Using registry python.exe: !REGISTRY_PATH!python.exe
-    )
-)
-
-if not defined ACTIVE_PYTHON (
-    set "REGISTRY_PATH="
-    for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\WOW6432Node\Python\PythonCore\3.11\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
-    if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
-        set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
-        set "ACTIVE_PYTHON_ARGS="
-        echo Using registry python.exe: !REGISTRY_PATH!python.exe
-    )
-)
-
-if not defined ACTIVE_PYTHON (
-    echo Searching common Conda/custom locations...
-    for %%F in (
-        "%UserProfile%\miniconda3\python.exe"
-        "%UserProfile%\anaconda3\python.exe"
-        "%LocalAppData%\miniconda3\python.exe"
-        "%LocalAppData%\anaconda3\python.exe"
-        "%ProgramData%\miniconda3\python.exe"
-        "%ProgramData%\anaconda3\python.exe"
-        "%UserProfile%\AppData\Local\Programs\Python\Launcher\python.exe"
-    ) do (
-        if not defined ACTIVE_PYTHON if exist %%~F (
-            set "ACTIVE_PYTHON="%%~F""
-            set "ACTIVE_PYTHON_ARGS="
-            echo Using detected python.exe: %%~F
-        )
-    )
-)
-
-if not defined ACTIVE_PYTHON (
     where python >nul 2>nul
     if not errorlevel 1 (
-        set "SYSTEM_PYTHON_PATH="
-        for /f "delims=" %%I in ('where python 2^>nul') do (
-            echo %%I | find /i "\WindowsApps\python.exe" >nul
-            if errorlevel 1 if not defined SYSTEM_PYTHON_PATH set "SYSTEM_PYTHON_PATH=%%I"
-        )
-        if defined SYSTEM_PYTHON_PATH (
-            set "ACTIVE_PYTHON="!SYSTEM_PYTHON_PATH!""
+        python -c "import sys" >nul 2>nul
+        if not errorlevel 1 (
+            set "ACTIVE_PYTHON=python"
             set "ACTIVE_PYTHON_ARGS="
-            echo Using python.exe on PATH: !SYSTEM_PYTHON_PATH!
-        ) else (
-            echo Ignoring WindowsApps python.exe alias on PATH.
+            echo Using python on PATH.
         )
     )
 )
 
 if not defined ACTIVE_PYTHON (
-    set "BUILD_ERROR=No usable Python interpreter was found. Set FRAME_MORPH_PYTHON to a real python.exe, or ensure py/python is available."
+    set "BUILD_ERROR=No usable Python interpreter was found on the command line. Please ensure py or python works in this terminal."
     goto :fail
 )
 
