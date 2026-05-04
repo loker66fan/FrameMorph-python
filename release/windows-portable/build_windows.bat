@@ -10,6 +10,7 @@ set "WHEELHOUSE_DIR=release\windows-portable\wheelhouse"
 set "EXPECTED_PYTHON_VERSION=3.11"
 set "BOOTSTRAP_INSTALLER=release\windows-portable\python-installer\python-3.11.9-amd64.exe"
 set "BOOTSTRAP_RUNTIME_DIR=release\windows-portable\python-runtime"
+set "BOOTSTRAP_INSTALL_LOG=release\windows-portable\python-runtime-install.log"
 set "ACTIVE_PYTHON="
 set "ACTIVE_PYTHON_ARGS="
 set "ACTIVE_PYTHON_VERSION="
@@ -73,14 +74,18 @@ if not defined ACTIVE_PYTHON (
         goto :fail
     )
     echo No usable Python %EXPECTED_PYTHON_VERSION% found. Installing bundled local runtime...
+    echo Installer: %BOOTSTRAP_INSTALLER%
+    echo Install log: %BOOTSTRAP_INSTALL_LOG%
+    echo A Python setup progress window should appear. This step may take a few minutes on slower machines.
     if exist "%BOOTSTRAP_RUNTIME_DIR%" rmdir /s /q "%BOOTSTRAP_RUNTIME_DIR%"
-    start /wait "" "%CD%\%BOOTSTRAP_INSTALLER%" /quiet InstallAllUsers=0 TargetDir="%CD%\%BOOTSTRAP_RUNTIME_DIR%" Include_pip=1 Include_launcher=0 AssociateFiles=0 Shortcuts=0 PrependPath=0 Include_test=0 Include_tcltk=0 Include_doc=0
+    if exist "%BOOTSTRAP_INSTALL_LOG%" del /f /q "%BOOTSTRAP_INSTALL_LOG%"
+    start /wait "" "%CD%\%BOOTSTRAP_INSTALLER%" /passive /log "%CD%\%BOOTSTRAP_INSTALL_LOG%" InstallAllUsers=0 TargetDir="%CD%\%BOOTSTRAP_RUNTIME_DIR%" Include_pip=1 Include_launcher=0 AssociateFiles=0 Shortcuts=0 PrependPath=0 Include_test=0 Include_tcltk=0 Include_doc=0
     if errorlevel 1 (
-        set "BUILD_ERROR=Failed to install bundled Python runtime."
+        set "BUILD_ERROR=Failed to install bundled Python runtime. See %BOOTSTRAP_INSTALL_LOG%."
         goto :fail
     )
     if not exist "%BOOTSTRAP_RUNTIME_DIR%\python.exe" (
-        set "BUILD_ERROR=Bundled Python installer completed, but python.exe was not found in %BOOTSTRAP_RUNTIME_DIR%."
+        set "BUILD_ERROR=Bundled Python installer completed, but python.exe was not found in %BOOTSTRAP_RUNTIME_DIR%. See %BOOTSTRAP_INSTALL_LOG%."
         goto :fail
     )
     for /f %%I in ('"%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "RUNTIME_PYTHON_VERSION=%%I"
@@ -186,6 +191,7 @@ echo Build deps    : %BUILD_REQUIREMENTS%
 echo Wheelhouse    : %WHEELHOUSE_DIR%
 echo Python       : %ACTIVE_PYTHON_VERSION%
 echo Runtime dir   : %BOOTSTRAP_RUNTIME_DIR%
+echo Install log   : %BOOTSTRAP_INSTALL_LOG%
 echo.
 echo Important: do not copy only FrameMorph-python.exe by itself.
 echo Copy the whole FrameMorph-python folder or use the generated zip package.

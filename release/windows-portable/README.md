@@ -75,6 +75,8 @@ The script now:
 - waits for a key press before closing
 - tries Python in this order: `py -3.11` launcher, `python` on PATH, project-local runtime, Windows registry, bundled installer
 - if Python 3.11 is missing, installs the bundled official offline Python runtime into `release/windows-portable/python-runtime/`
+- writes the installer log to `release/windows-portable/python-runtime-install.log`
+- uses a visible Python installer progress window instead of a fully silent install
 - creates an isolated `.build-venv` before packaging to avoid polluted global Python environments
 - checks that the resolved interpreter is Python 3.11, which matches the bundled offline wheels
 - installs from `release/windows-portable/wheelhouse/` first when local wheel files are present
