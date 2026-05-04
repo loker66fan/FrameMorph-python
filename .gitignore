@@ -18,6 +18,9 @@ dist/
 *.spec
 release/windows-build-output/*
 !release/windows-build-output/README.md
+release/windows-portable/python-installer/*
+!release/windows-portable/python-installer/README.md
+release/windows-portable/python-runtime/
 release/windows-portable/wheelhouse/*
 release/windows-portable/wheelhouse/**
 !release/windows-portable/wheelhouse/README.md

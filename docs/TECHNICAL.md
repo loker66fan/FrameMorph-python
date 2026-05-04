@@ -48,9 +48,11 @@ FrameMorph-python/
 │   └── windows-portable/
 │       ├── build_windows.bat
 │       ├── FrameMorph-python.spec
+│       ├── python-installer/
 │       ├── requirements-windows-build.txt
 │       └── wheelhouse/
 ├── scripts/
+│   ├── build_windows_offline_package.py
 │   └── prepare_windows_offline_wheels.py
 ├── requirements.txt
 └── 方案.md
@@ -172,19 +174,24 @@ FrameMorph-python/
 - 离线 wheel 目标解释器固定为 Python 3.11 x64
 - Windows 打包依赖使用 `opencv-contrib-python`，保证 `dnn_superres` 可用
 - `SRCNN` 不是默认打包能力，因为默认离线依赖包不包含 `torch`
+- 可选携带官方离线 Python 3.11 安装器，解决目标机器无 Python 预装的问题
 
 ### 5.2 离线打包链路
 
 离线打包支持依赖以下目录和脚本：
 
 - `release/windows-portable/wheelhouse/`
+- `release/windows-portable/python-installer/`
 - `scripts/prepare_windows_offline_wheels.py`
+- `scripts/build_windows_offline_package.py`
 - `release/offline-packages/`
 
 约定如下：
 
 - `wheelhouse/` 用来存放 Windows 打包所需的离线 `.whl`
+- `python-installer/` 用来存放官方离线 Windows Python 安装器
 - `build_windows.bat` 会优先从本地 `wheelhouse/` 用 `--no-index` 安装依赖
+- 当目标机器缺少 Python 3.11 时，`build_windows.bat` 会优先尝试使用或安装本地私有 Python 运行时
 - `release/offline-packages/` 用来生成可直接拷到无网 Windows 机器上的离线压缩包
 
 ### 5.3 哪些内容应提交到 GitHub
@@ -194,12 +201,15 @@ FrameMorph-python/
 - 打包脚本和说明文档
 - `requirements-windows-build.txt`
 - `scripts/prepare_windows_offline_wheels.py`
+- `scripts/build_windows_offline_package.py`
 - `wheelhouse/README.md`
+- `python-installer/README.md`
 - `release/offline-packages/.gitkeep`
 
 不应提交：
 
 - `wheelhouse/` 中实际下载的 `.whl`
+- `python-installer/` 中实际下载的 `.exe`
 - `release/offline-packages/` 中实际生成的离线 ZIP
 - `release/windows-build-output/` 中实际构建产物
 
@@ -215,7 +225,8 @@ FrameMorph-python/
 - 增加 `dnn_superres` 模型识别与匹配校验
 - 增加后台导出线程、进度、ETA、取消导出
 - 将运行时 OpenCV 依赖切换为 `opencv-contrib-python`
-- 增加 Windows 离线打包依赖清单与离线 wheel 准备脚本
+- 增加 Windows 离线打包依赖清单、离线 wheel 准备脚本与离线 ZIP 生成脚本
+- 增加无 Python 预装场景下的本地私有 Python 引导安装流程
 - 增加 GUI 打包环境下的 `faulthandler` 兼容处理
 - 在缺少 `torch` 时自动禁用 `SRCNN`
 
@@ -275,6 +286,7 @@ FrameMorph-python/
 - `release/windows-portable/requirements-windows-build.txt`
 - `.github/workflows/windows-portable-build.yml`
 - `scripts/prepare_windows_offline_wheels.py`
+- `scripts/build_windows_offline_package.py`
 
 ## 8. 常见问题定位
 
@@ -306,6 +318,7 @@ FrameMorph-python/
 优先检查：
 
 - 是否使用 Python 3.11 x64
+- `python-installer/` 中是否存在 `python-3.11.9-amd64.exe`
 - `wheelhouse/` 中是否包含 `pefile`、`pywin32-ctypes`、`pywin32`
 - `requirements-windows-build.txt` 是否和打包脚本保持一致
 - 是否误把离线 ZIP 当作仓库源码直接在压缩包内部运行而未完整解压

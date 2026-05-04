@@ -24,6 +24,8 @@ Recommended options:
   - PyInstaller spec file
 - `requirements-windows-build.txt`
   - pinned Windows build dependency list
+- `python-installer/`
+  - bundled official offline Python installer location
 - `wheelhouse/`
   - offline wheel bundle directory
 - `README.md`
@@ -31,13 +33,24 @@ Recommended options:
 
 ## Offline Packaging Preparation
 
-If the target Windows machine has no internet access, prepare the dependency wheels on a machine that does have internet first:
+If the target Windows machine has no internet access, prepare the dependency bundle on a machine that does have internet first:
 
 ```bash
 python scripts/prepare_windows_offline_wheels.py
 ```
 
-This downloads the Windows build wheels into:
+This downloads:
+
+- the Windows build wheels into `release/windows-portable/wheelhouse/`
+- the official offline Python installer into `release/windows-portable/python-installer/`
+
+The bundled installer is meant for target machines that have neither internet nor Python preinstalled.
+
+```text
+release/windows-portable/python-installer/python-3.11.9-amd64.exe
+```
+
+The wheel bundle is stored in:
 
 ```text
 release/windows-portable/wheelhouse/
@@ -47,9 +60,8 @@ After that, copy the entire repository to the offline Windows machine.
 
 ## Build Steps on Windows
 
-1. Install Python 3.11 x64
-2. Open PowerShell or CMD in the project root
-3. Run:
+1. Open PowerShell or CMD in the project root
+2. Run:
 
 ```bat
 release\windows-portable\build_windows.bat
@@ -61,8 +73,9 @@ The script now:
 - prints output paths on success
 - prints the failure reason on error
 - waits for a key press before closing
+- if Python 3.11 is missing, installs the bundled official offline Python runtime into `release/windows-portable/python-runtime/`
 - creates an isolated `.build-venv` before packaging to avoid polluted global Python environments
-- checks that the local interpreter is Python 3.11, which matches the bundled offline wheels
+- checks that the resolved interpreter is Python 3.11, which matches the bundled offline wheels
 - installs from `release/windows-portable/wheelhouse/` first when local wheel files are present
 - falls back to online installation only when no offline wheelhouse is available
 
@@ -104,6 +117,11 @@ The default offline dependency bundle includes the packaging stack for:
 - NumPy
 - OpenCV contrib
 - PyInstaller
+
+When the bundled Python installer is present, the offline package can be used on a Windows machine that has:
+
+- no internet access
+- no Python installed in advance
 
 PyTorch is intentionally not included in the default wheelhouse because it would make offline transfer much larger.
 

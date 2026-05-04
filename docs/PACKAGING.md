@@ -114,21 +114,25 @@ To prepare for a Windows machine without internet access:
 python scripts/prepare_windows_offline_wheels.py
 ```
 
-2. Verify that this directory contains `.whl` files:
+2. Verify that these offline assets exist:
 
 ```text
 release/windows-portable/wheelhouse/
+release/windows-portable/python-installer/python-3.11.9-amd64.exe
 ```
 
 3. Copy the full repository to the offline Windows machine.
-4. Make sure the offline Windows machine uses Python 3.11 x64.
-5. Run:
+4. Run:
 
 ```bat
 release\windows-portable\build_windows.bat
 ```
 
-The build script will install from the local wheelhouse with `--no-index` before attempting any network access.
+The build script will:
+
+- use a local Python 3.11 if it already exists
+- otherwise install the bundled official offline Python 3.11 runtime into `release/windows-portable/python-runtime/`
+- install from the local wheelhouse with `--no-index` before attempting any network access
 
 ## 10. Notes About OpenCV and Models
 
