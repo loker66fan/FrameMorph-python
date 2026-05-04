@@ -34,6 +34,7 @@ FrameMorph-python/
 │   ├── export_support.py
 │   ├── main_window.py
 │   ├── transform_view.py
+│   ├── warp_support.py
 │   └── warp_view.py
 ├── utils/
 │   └── image_utils.py
@@ -98,6 +99,7 @@ FrameMorph-python/
   - 控件创建
   - 各功能模式切换
   - 调用 `core/` 与 `utils/`
+  - 右侧按钮组改为纵向堆叠，降低低分辨率下的文字溢出风险
 - `export_mixin.py`
   - 导出面板构建
   - 导出预览
@@ -105,6 +107,7 @@ FrameMorph-python/
   - 导出任务窗口与导出流程编排
   - `torch` 缺失时自动禁用 `SRCNN`
   - `dnn_superres` 优先复用本地 `models/opencv_dnn_superres/` 中的模型
+  - 导出面板按钮组改为单列布局，减小窄分辨率下的横向溢出
 - `transform_view.py`
   - 主画布 `QGraphicsView`
   - 图片显示、覆盖层、拖拽、缩放
@@ -113,6 +116,9 @@ FrameMorph-python/
   - 超分模型配置
   - 模型下载线程
   - 导出线程
+- `warp_support.py`
+  - 网格/透视实时预览后台线程
+  - 网格最终应用后台线程
 
 ### `utils/`
 
@@ -160,6 +166,19 @@ FrameMorph-python/
 
 这部分是当前最重要的性能优化点之一。
 
+### 4.4 网格预览与应用链路
+
+当前网格相关流程分成两条：
+
+1. 实时预览
+   - `MainWindow._schedule_live_preview()`
+   - `LiveWarpPreviewThread`
+   - 预览阶段会自动降采样，并在后台线程中执行
+2. 最终应用
+   - `MainWindow.apply_mesh_warp()`
+   - `MeshWarpApplyThread`
+   - 最终高质量输出也放到后台线程，避免主界面卡死
+
 ## 5. Windows 打包与离线构建链路
 
 ### 5.1 在线打包链路
@@ -171,10 +190,9 @@ FrameMorph-python/
 
 当前约束：
 
-- 离线 wheel 目标解释器固定为 Python 3.11 x64
 - Windows 打包依赖使用 `opencv-contrib-python`，保证 `dnn_superres` 可用
 - `SRCNN` 不是默认打包能力，因为默认离线依赖包不包含 `torch`
-- 可选携带官方离线 Python 3.11 安装器，解决目标机器无 Python 预装的问题
+- 当前 `build_windows.bat` 已简化为依赖命令行已有可用 Python
 
 ### 5.2 离线打包链路
 
@@ -191,7 +209,7 @@ FrameMorph-python/
 - `wheelhouse/` 用来存放 Windows 打包所需的离线 `.whl`
 - `python-installer/` 用来存放官方离线 Windows Python 安装器
 - `build_windows.bat` 会优先从本地 `wheelhouse/` 用 `--no-index` 安装依赖
-- 当目标机器缺少 Python 3.11 时，`build_windows.bat` 会优先尝试使用或安装本地私有 Python 运行时
+- 当前 `build_windows.bat` 默认信任设备上命令行可直接调用的 Python，不再尝试自动安装包内 Python
 - `release/offline-packages/` 用来生成可直接拷到无网 Windows 机器上的离线压缩包
 
 ### 5.3 哪些内容应提交到 GitHub
@@ -226,9 +244,10 @@ FrameMorph-python/
 - 增加后台导出线程、进度、ETA、取消导出
 - 将运行时 OpenCV 依赖切换为 `opencv-contrib-python`
 - 增加 Windows 离线打包依赖清单、离线 wheel 准备脚本与离线 ZIP 生成脚本
-- 增加无 Python 预装场景下的本地私有 Python 引导安装流程
 - 增加 GUI 打包环境下的 `faulthandler` 兼容处理
 - 在缺少 `torch` 时自动禁用 `SRCNN`
+- 将网格实时预览和最终应用迁移到后台线程
+- 将右侧面板按钮组改为更适合低分辨率的纵向堆叠布局
 
 ### 当前仍然偏重的模块
 
@@ -269,6 +288,7 @@ FrameMorph-python/
 - `MainWindow.update_export_comparison_preview()`
 - `scaled_preview_image()`
 - `MeshWarpController._profile()`
+- `ui/warp_support.py`
 
 ### 7.4 修改 `dnn_superres` 时
 
@@ -306,20 +326,27 @@ FrameMorph-python/
 - 是否是大图
 - 是否在导出而不是预览
 
+### 网格操作卡顿
+
+优先检查：
+
+- `ui/warp_support.py` 是否仍在后台线程执行
+- `MeshWarpController._profile()` 的 preview 参数是否被调得过重
+- 当前是否在最终应用高质量网格变形，而不是只看预览
+
 ### 右侧面板拥挤
 
 优先修改：
 
 - `main_window.py` 的面板布局
+- `export_mixin.py` 的按钮编排方式
 - 是否能继续拆成子面板模块
 
 ### Windows 打包失败
 
 优先检查：
 
-- 是否使用 Python 3.11 x64
-- `python-installer/` 中是否存在 `python-3.11.9-amd64.exe`
-- `wheelhouse/` 中是否包含 `pefile`、`pywin32-ctypes`、`pywin32`
+- 当前终端里 `py` 或 `python` 是否真的可调用
 - `requirements-windows-build.txt` 是否和打包脚本保持一致
 - 是否误把离线 ZIP 当作仓库源码直接在压缩包内部运行而未完整解压
 

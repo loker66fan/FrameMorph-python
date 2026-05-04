@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QFileDialog, QFrame, QLabel, QProgressDialog, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFileDialog, QFrame, QLabel, QProgressDialog, QVBoxLayout, QWidget, QSizePolicy
 from qfluentwidgets import (
     BodyLabel,
     ComboBox,
@@ -61,7 +61,7 @@ class ExportMixin:
         self.export_srcnn_model_path = TextEdit()
         self.export_srcnn_model_path.setFixedHeight(42)
         self.export_srcnn_model_path.setPlaceholderText("SRCNN 模型路径，例如 /path/to/srcnn_x2.pth")
-        self.export_srcnn_browse_button = PushButton("选择 SRCNN 模型文件")
+        self.export_srcnn_browse_button = PushButton("选择 SRCNN 模型")
         self.export_srcnn_browse_button.clicked.connect(self.pick_srcnn_model_file)
         self.export_dnn_model_combo = ComboBox()
         for key, spec in DNN_SUPERRES_MODEL_SPECS.items():
@@ -73,7 +73,7 @@ class ExportMixin:
         self.export_dnn_model_path = TextEdit()
         self.export_dnn_model_path.setFixedHeight(42)
         self.export_dnn_model_path.setPlaceholderText("dnn_superres 模型路径，例如 /path/to/EDSR_x4.pb")
-        self.export_dnn_browse_button = PushButton("选择 dnn_superres 模型文件")
+        self.export_dnn_browse_button = PushButton("选择 dnn_superres 模型")
         self.export_dnn_browse_button.clicked.connect(self.pick_dnn_model_file)
         self.export_dnn_download_button = PushButton("训练资料")
         self.export_dnn_download_button.clicked.connect(self.open_selected_dnn_download_docs)
@@ -109,10 +109,17 @@ class ExportMixin:
         layout.addWidget(BodyLabel("dnn_superres 模型路径"))
         layout.addWidget(self.export_dnn_model_path)
         layout.addWidget(self.export_dnn_browse_button)
-        doc_grid = self._two_column_button_grid(self.export_dnn_fetch_button, self.export_dnn_download_button)
-        doc_grid.addWidget(self.export_dnn_code_button, 1, 0)
-        doc_grid.addWidget(self.export_dnn_paper_button, 1, 1)
-        layout.addLayout(doc_grid)
+        doc_actions = QVBoxLayout()
+        doc_actions.setSpacing(8)
+        for button in [
+            self.export_dnn_fetch_button,
+            self.export_dnn_download_button,
+            self.export_dnn_code_button,
+            self.export_dnn_paper_button,
+        ]:
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            doc_actions.addWidget(button)
+        layout.addLayout(doc_actions)
         layout.addWidget(self.export_dnn_info_label)
 
         layout.addWidget(BodyLabel("导出前预览"))
@@ -125,7 +132,13 @@ class ExportMixin:
         preview_btn.clicked.connect(self.update_export_comparison_preview)
         export_btn = PrimaryPushButton("导出当前图片")
         export_btn.clicked.connect(self.export_image_dialog)
-        layout.addLayout(self._two_column_button_grid(preview_btn, export_btn))
+        preview_actions = QVBoxLayout()
+        preview_actions.setSpacing(8)
+        preview_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        export_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        preview_actions.addWidget(preview_btn)
+        preview_actions.addWidget(export_btn)
+        layout.addLayout(preview_actions)
 
         self.export_hint_label = BodyLabel("支持经典超分、SRCNN 与 4 种 OpenCV dnn_superres 模型，可选在线资料或本地自定义模型。")
         self.export_hint_label.setObjectName("panelHintLabel")
@@ -191,8 +204,9 @@ class ExportMixin:
         layout.setSpacing(0)
         label = QLabel()
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setMinimumSize(200, 200)
-        label.setMaximumSize(200, 200)
+        label.setMinimumSize(160, 160)
+        label.setMaximumSize(180, 180)
+        label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout.addWidget(label, 0, Qt.AlignmentFlag.AlignCenter)
         frame._preview_label = label  # type: ignore[attr-defined]
         return frame
@@ -298,7 +312,7 @@ class ExportMixin:
             self.export_srcnn_model_path.setPlaceholderText("SRCNN 模型路径，例如 /path/to/srcnn_x2.pth")
             return
 
-        self.export_srcnn_radio.setText("PyTorch SRCNN（需单独安装 torch）")
+        self.export_srcnn_radio.setText("PyTorch SRCNN（需 torch）")
         self.export_srcnn_radio.setChecked(False)
         self.export_sr_radio.setChecked(True)
         self.export_srcnn_model_path.setPlainText("")
@@ -393,7 +407,7 @@ class ExportMixin:
 
     def _reset_dnn_download_button_state(self) -> None:
         self.export_dnn_fetch_button.setEnabled(True)
-        self.export_dnn_fetch_button.setText("下载当前训练模型到本地")
+        self.export_dnn_fetch_button.setText("下载模型到本地")
         self._model_download_thread = None
 
     def _build_export_image(self) -> Image.Image:

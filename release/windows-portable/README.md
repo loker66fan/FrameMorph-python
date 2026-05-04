@@ -44,7 +44,7 @@ This downloads:
 - the Windows build wheels into `release/windows-portable/wheelhouse/`
 - the official offline Python installer into `release/windows-portable/python-installer/`
 
-The bundled installer is meant for target machines that have neither internet nor Python preinstalled.
+The bundled installer is still available in the offline bundle, but the current `build_windows.bat` no longer tries to manage Python installation automatically.
 
 ```text
 release/windows-portable/python-installer/python-3.11.9-amd64.exe
@@ -77,7 +77,7 @@ The script now:
 - resolves Python in this order: `FRAME_MORPH_PYTHON`, `py -3`, `py`, then `python` on PATH
 - creates an isolated temporary virtual environment before packaging
 - installs from `release/windows-portable/wheelhouse/` first when local wheel files are present
-- falls back to online installation only when no offline wheelhouse is available
+- falls back to online dependency installation only when no offline wheelhouse is available
 
 If your machine has multiple Python installs or PATH points to the Microsoft Store alias, set a real interpreter explicitly before running:
 

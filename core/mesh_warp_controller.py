@@ -137,10 +137,10 @@ class MeshWarpController:
         if render_mode == self.PREVIEW:
             return MeshRenderProfile(
                 interpolation=cv2.INTER_LINEAR,
-                solve_dtype=np.float64,
+                solve_dtype=np.float32,
                 sample_dtype=np.float32,
-                max_query_points=120_000,
-                regularization=2e-3,
+                max_query_points=48_000,
+                regularization=4e-3,
             )
         return MeshRenderProfile(
             interpolation=cv2.INTER_LANCZOS4,

@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
+    QProgressDialog,
 )
 from qfluentwidgets import (
     BodyLabel,
@@ -52,10 +54,8 @@ from core.perspective_controller import PerspectiveController
 from core.text_controller import TextOverlay, TextOverlayController
 from core.transform_controller import TransformController
 from ui.export_mixin import ExportMixin
+from ui.warp_support import LiveWarpPreviewThread, MeshWarpApplyThread
 from ui.transform_view import ImageGraphicsView
-from utils.image_utils import (
-    scaled_preview_image,
-)
 
 
 class MainWindow(ExportMixin, FluentWindow):
@@ -88,6 +88,9 @@ class MainWindow(ExportMixin, FluentWindow):
         self._export_progress_dialog = None
         self._export_preview_cache_key: Optional[tuple] = None
         self._export_preview_cache_image: Optional[Image.Image] = None
+        self._live_preview_thread = None
+        self._mesh_apply_thread = None
+        self._mesh_apply_dialog = None
 
         self.preview_timer = QTimer(self)
         self.preview_timer.setSingleShot(True)
@@ -152,6 +155,9 @@ class MainWindow(ExportMixin, FluentWindow):
         canvas_layout.addWidget(self.view, 1)
 
         self.right_card = CardWidget()
+        self.right_card.setMinimumWidth(340)
+        self.right_card.setMaximumWidth(460)
+        self.right_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         right_layout = QVBoxLayout(self.right_card)
         right_layout.setContentsMargins(18, 18, 18, 18)
         right_layout.setSpacing(12)
@@ -184,13 +190,13 @@ class MainWindow(ExportMixin, FluentWindow):
         self.panel_scroll_area = QScrollArea()
         self.panel_scroll_area.setWidgetResizable(True)
         self.panel_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        self.panel_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.panel_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.panel_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.panel_scroll_area.setWidget(self.panel_stack)
         right_layout.addWidget(self.panel_scroll_area, 1)
 
-        layout.addWidget(canvas_card, 3)
-        layout.addWidget(self.right_card, 1)
+        layout.addWidget(canvas_card, 5)
+        layout.addWidget(self.right_card, 2)
         self._apply_panel_styles()
         return page
 
@@ -320,7 +326,7 @@ class MainWindow(ExportMixin, FluentWindow):
         bulge.clicked.connect(lambda: self.view.apply_mesh_preset(0.22))
         preset_row = self._two_column_button_grid(shrink, bulge)
         layout.addLayout(preset_row)
-        self.mesh_info_label = BodyLabel("支持拖动内外网格点，松手后刷新预览。")
+        self.mesh_info_label = BodyLabel("支持拖动内外网格点。预览会自动降采样并在后台刷新，弱机器更稳定。")
         self.mesh_info_label.setObjectName("panelHintLabel")
         self.mesh_info_label.setWordWrap(True)
         layout.addWidget(self.mesh_info_label)
@@ -373,20 +379,16 @@ class MainWindow(ExportMixin, FluentWindow):
         self.text_size_spin.setValue(36)
         self.text_color_button = ColorPickerButton(QColor("#ffffff"), "文字颜色")
         self.text_bold_switch = SwitchButton()
-        style_row = QHBoxLayout()
-        size_layout = QVBoxLayout()
-        size_layout.addWidget(BodyLabel("字号"))
-        size_layout.addWidget(self.text_size_spin)
-        color_layout = QVBoxLayout()
-        color_layout.addWidget(BodyLabel("颜色"))
-        color_layout.addWidget(self.text_color_button)
-        bold_layout = QVBoxLayout()
-        bold_layout.addWidget(BodyLabel("粗体"))
-        bold_layout.addWidget(self.text_bold_switch)
-        style_row.addLayout(size_layout)
-        style_row.addLayout(color_layout)
-        style_row.addLayout(bold_layout)
-        layout.addLayout(style_row)
+        style_grid = QGridLayout()
+        style_grid.setHorizontalSpacing(8)
+        style_grid.setVerticalSpacing(8)
+        style_grid.addWidget(BodyLabel("字号"), 0, 0)
+        style_grid.addWidget(self.text_size_spin, 1, 0)
+        style_grid.addWidget(BodyLabel("颜色"), 0, 1)
+        style_grid.addWidget(self.text_color_button, 1, 1)
+        style_grid.addWidget(BodyLabel("粗体"), 2, 0)
+        style_grid.addWidget(self.text_bold_switch, 2, 1)
+        layout.addLayout(style_grid)
 
         add_btn = PrimaryPushButton("新增文字图层")
         add_btn.clicked.connect(self.add_text_overlay)
@@ -413,8 +415,13 @@ class MainWindow(ExportMixin, FluentWindow):
         layout = QGridLayout()
         layout.setHorizontalSpacing(8)
         layout.setVerticalSpacing(8)
+        if hasattr(left, "setSizePolicy"):
+            left.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        if hasattr(right, "setSizePolicy"):
+            right.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.setColumnStretch(0, 1)
         layout.addWidget(left, 0, 0)
-        layout.addWidget(right, 0, 1)
+        layout.addWidget(right, 1, 0)
         return layout
 
     def _apply_panel_styles(self) -> None:
@@ -606,12 +613,26 @@ class MainWindow(ExportMixin, FluentWindow):
         if image is None or source_points is None or target_points is None:
             self._show_error("请先进入网格变形模式。")
             return
-        try:
-            result = self.mesh_controller.warp_mesh(image, source_points, target_points, render_mode=self.mesh_controller.FINAL)
-        except Exception as exc:
-            self._show_error(f"网格变形失败：{exc}")
+        if self._mesh_apply_thread is not None and self._mesh_apply_thread.isRunning():
+            self._show_error("当前已有网格变形任务正在计算，请稍候。")
             return
-        self._commit_image(result, "已应用网格变形。")
+
+        dialog = QProgressDialog("正在后台计算网格变形…", "", 0, 0, self)
+        dialog.setWindowTitle("网格变形")
+        dialog.setCancelButton(None)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self._mesh_apply_dialog = dialog
+
+        self._mesh_apply_thread = MeshWarpApplyThread(image, source_points, target_points)
+        self._mesh_apply_thread.warp_finished.connect(self._handle_mesh_apply_finished)
+        self._mesh_apply_thread.warp_failed.connect(self._handle_mesh_apply_failed)
+        self._mesh_apply_thread.finished.connect(self._cleanup_mesh_apply_task)
+        self._mesh_apply_thread.start()
+        dialog.show()
+        self._update_status("正在后台计算网格变形…")
 
     def apply_perspective(self) -> None:
         image = self.image_model.current_image
@@ -788,7 +809,7 @@ class MainWindow(ExportMixin, FluentWindow):
             return
         self._preview_pending = True
         self._preview_generation += 1
-        self.preview_timer.start(60)
+        self.preview_timer.start(120 if self.current_mode == "mesh" else 60)
 
     def _render_live_preview(self) -> None:
         if self._preview_rendering or self._is_dragging_active():
@@ -799,40 +820,72 @@ class MainWindow(ExportMixin, FluentWindow):
             return
         generation = self._preview_generation
         self._preview_pending = False
+        mode = self.current_mode
+        if mode == "mesh":
+            source_points = self.view.get_mesh_source_points()
+            target_points = self.view.get_mesh_target_points()
+            if source_points is None or target_points is None:
+                return
+            thread = LiveWarpPreviewThread(
+                image,
+                mode="mesh",
+                generation=generation,
+                preview_max_side=420,
+                source_points=source_points,
+                target_points=target_points,
+            )
+        else:
+            points = self.view.get_perspective_points()
+            if points is None:
+                return
+            thread = LiveWarpPreviewThread(
+                image,
+                mode="perspective",
+                generation=generation,
+                preview_max_side=720,
+                perspective_points=points,
+            )
         self._preview_rendering = True
-        try:
-            preview_input, scale = scaled_preview_image(image)
-            if self.current_mode == "mesh":
-                source_points = self.view.get_mesh_source_points()
-                target_points = self.view.get_mesh_target_points()
-                if source_points is None or target_points is None:
-                    return
-                preview_image = self.mesh_controller.warp_mesh(
-                    preview_input,
-                    source_points * scale,
-                    target_points * scale,
-                    render_mode=self.mesh_controller.PREVIEW,
-                )
-            else:
-                points = self.view.get_perspective_points()
-                if points is None:
-                    return
-                preview_image = self.perspective_controller.warp(
-                    preview_input,
-                    points * scale,
-                    render_mode=self.perspective_controller.PREVIEW,
-                )
-        except Exception:
+        self._live_preview_thread = thread
+        thread.preview_ready.connect(self._handle_live_preview_ready)
+        thread.preview_failed.connect(self._handle_live_preview_failed)
+        thread.finished.connect(self._handle_live_preview_complete)
+        thread.start()
+
+    def _handle_live_preview_ready(self, generation: int, preview_image: Image.Image, display_size: tuple[int, int]) -> None:
+        if generation != self._preview_generation:
             return
-        finally:
-            self._preview_rendering = False
-        if generation != self._preview_generation or self.image_model.current_image is not image:
-            if self._preview_pending:
-                self.preview_timer.start(10)
+        if self.image_model.current_image is None or self.current_mode not in {"mesh", "perspective"}:
             return
-        self.view.set_preview_image(preview_image, display_size=image.size)
-        if self._preview_pending:
+        self.view.set_preview_image(preview_image, display_size=display_size)
+
+    def _handle_live_preview_failed(self, generation: int, message: str) -> None:
+        if generation != self._preview_generation:
+            return
+        self._update_status(f"预览刷新失败：{message}")
+
+    def _handle_live_preview_complete(self) -> None:
+        self._preview_rendering = False
+        self._live_preview_thread = None
+        if self._preview_pending and not self._is_dragging_active():
             self.preview_timer.start(10)
+
+    def _handle_mesh_apply_finished(self, image: Image.Image) -> None:
+        if self._mesh_apply_dialog is not None:
+            self._mesh_apply_dialog.close()
+        self._commit_image(image, "已应用网格变形。")
+
+    def _handle_mesh_apply_failed(self, message: str) -> None:
+        if self._mesh_apply_dialog is not None:
+            self._mesh_apply_dialog.close()
+        self._show_error(f"网格变形失败：{message}")
+        self._update_status(f"网格变形失败：{message}")
+
+    def _cleanup_mesh_apply_task(self) -> None:
+        if self._mesh_apply_dialog is not None:
+            self._mesh_apply_dialog.close()
+            self._mesh_apply_dialog = None
+        self._mesh_apply_thread = None
 
     def _update_text_preview(self) -> None:
         self.view.set_text_overlays(self.image_model.text_items)

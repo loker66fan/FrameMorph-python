@@ -128,11 +128,16 @@ release/windows-portable/python-installer/python-3.11.9-amd64.exe
 release\windows-portable\build_windows.bat
 ```
 
-The build script will:
+The current build script assumes the target terminal can already run a usable Python interpreter through `py` or `python`.
 
-- use a local Python 3.11 if it already exists
-- otherwise install the bundled official offline Python 3.11 runtime into `release/windows-portable/python-runtime/`
-- install from the local wheelhouse with `--no-index` before attempting any network access
+If the wrong interpreter is selected, set it explicitly:
+
+```bat
+set FRAME_MORPH_PYTHON=C:\Path\To\python.exe
+release\windows-portable\build_windows.bat
+```
+
+Dependency installation still prefers the local wheelhouse with `--no-index` before attempting any network access.
 
 ## 10. Notes About OpenCV and Models
 
