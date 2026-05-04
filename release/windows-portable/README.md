@@ -22,12 +22,32 @@ Recommended options:
   - one-click Windows build script
 - `FrameMorph-python.spec`
   - PyInstaller spec file
+- `requirements-windows-build.txt`
+  - pinned Windows build dependency list
+- `wheelhouse/`
+  - offline wheel bundle directory
 - `README.md`
   - this guide
 
+## Offline Packaging Preparation
+
+If the target Windows machine has no internet access, prepare the dependency wheels on a machine that does have internet first:
+
+```bash
+python scripts/prepare_windows_offline_wheels.py
+```
+
+This downloads the Windows build wheels into:
+
+```text
+release/windows-portable/wheelhouse/
+```
+
+After that, copy the entire repository to the offline Windows machine.
+
 ## Build Steps on Windows
 
-1. Install Python 3.11+
+1. Install Python 3.11 x64
 2. Open PowerShell or CMD in the project root
 3. Run:
 
@@ -42,6 +62,9 @@ The script now:
 - prints the failure reason on error
 - waits for a key press before closing
 - creates an isolated `.build-venv` before packaging to avoid polluted global Python environments
+- checks that the local interpreter is Python 3.11, which matches the bundled offline wheels
+- installs from `release/windows-portable/wheelhouse/` first when local wheel files are present
+- falls back to online installation only when no offline wheelhouse is available
 
 ## Expected Output
 
@@ -72,6 +95,17 @@ release\windows-build-output\FrameMorph-python-windows-portable.zip
 - models folder
 - assets folder
 - documentation files selected in the build script/spec
+
+The default offline dependency bundle includes the packaging stack for:
+
+- PySide6
+- PySide6-Fluent-Widgets
+- Pillow
+- NumPy
+- OpenCV contrib
+- PyInstaller
+
+PyTorch is intentionally not included in the default wheelhouse because it would make offline transfer much larger.
 
 ## Distribution Recommendation
 

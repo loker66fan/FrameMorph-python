@@ -1,4 +1,5 @@
 import faulthandler
+import sys
 
 from PySide6.QtWidgets import QApplication
 
@@ -6,7 +7,8 @@ from ui.main_window import MainWindow
 
 
 def main() -> int:
-    faulthandler.enable()
+    if sys.stderr is not None:
+        faulthandler.enable(sys.stderr)
     app = QApplication([])
     app.setApplicationName("形绘")
     window = MainWindow()

@@ -10,11 +10,20 @@ __pycache__/
 .venv/
 venv/
 env/
+.build-venv/
 
 # Build / packaging
 build/
 dist/
 *.spec
+release/windows-build-output/*
+!release/windows-build-output/README.md
+release/windows-portable/wheelhouse/*
+release/windows-portable/wheelhouse/**
+!release/windows-portable/wheelhouse/README.md
+release/offline-packages/*
+release/offline-packages/**
+!release/offline-packages/.gitkeep
 
 # IDE / editor
 .idea/

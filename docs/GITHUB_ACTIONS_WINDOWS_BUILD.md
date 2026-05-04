@@ -15,7 +15,7 @@ The workflow:
 1. checks out the repository
 2. reads the current version from `VERSION`
 3. installs Python 3.11
-4. installs dependencies
+4. installs dependencies from `release/windows-portable/requirements-windows-build.txt`
 5. runs PyInstaller with `release/windows-portable/FrameMorph-python.spec`
 6. creates a ZIP package from `dist/FrameMorph-python/`
 7. uploads the build as a GitHub Actions artifact

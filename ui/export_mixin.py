@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from importlib.util import find_spec
 from pathlib import Path
 
 from PIL import Image
@@ -132,6 +133,7 @@ class ExportMixin:
         layout.addWidget(self.export_hint_label)
         layout.addStretch(1)
         self._sync_export_dnn_model_controls()
+        self._sync_optional_export_backends()
         return page
 
     def export_image_dialog(self) -> None:
@@ -278,6 +280,30 @@ class ExportMixin:
     def _build_dnn_model_cache_path(self, model_key: str, scale: int) -> Path:
         return SUPERRES_MODEL_CACHE_DIR / self._build_dnn_model_filename(model_key, scale)
 
+    def _is_managed_dnn_cache_path(self, path: str) -> bool:
+        if not path:
+            return False
+        try:
+            return Path(path).resolve().parent == SUPERRES_MODEL_CACHE_DIR.resolve()
+        except Exception:
+            return False
+
+    def _sync_optional_export_backends(self) -> None:
+        srcnn_available = find_spec("torch") is not None
+        self.export_srcnn_radio.setEnabled(srcnn_available)
+        self.export_srcnn_model_path.setEnabled(srcnn_available)
+        self.export_srcnn_browse_button.setEnabled(srcnn_available)
+        if srcnn_available:
+            self.export_srcnn_radio.setText("PyTorch SRCNN")
+            self.export_srcnn_model_path.setPlaceholderText("SRCNN 模型路径，例如 /path/to/srcnn_x2.pth")
+            return
+
+        self.export_srcnn_radio.setText("PyTorch SRCNN（需单独安装 torch）")
+        self.export_srcnn_radio.setChecked(False)
+        self.export_sr_radio.setChecked(True)
+        self.export_srcnn_model_path.setPlainText("")
+        self.export_srcnn_model_path.setPlaceholderText("当前构建未包含 torch，SRCNN 已禁用。")
+
     def _sync_export_dnn_model_controls(self) -> None:
         spec = self._current_dnn_spec()
         current_scale = self.export_dnn_scale_combo.currentData()
@@ -296,6 +322,12 @@ class ExportMixin:
             f"dnn_superres 模型路径，例如 /path/to/{spec['label']}_x{target_scale}.pb"
         )
         cache_path = self._build_dnn_model_cache_path(self._current_dnn_model_key(), int(target_scale))
+        current_path = self.export_dnn_model_path.toPlainText().strip()
+        if cache_path.exists():
+            if not current_path or self._is_managed_dnn_cache_path(current_path):
+                self.export_dnn_model_path.setPlainText(str(cache_path))
+        elif not current_path or self._is_managed_dnn_cache_path(current_path):
+            self.export_dnn_model_path.setPlainText("")
         self.export_dnn_info_label.setText(
             f"{spec['label']}：{spec['summary']} {spec['details']} 可直接下载到本地缓存 {cache_path}，也可手动指定本地 .pb 文件。"
         )

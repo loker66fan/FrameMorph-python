@@ -16,6 +16,12 @@ This document describes a practical baseline packaging workflow for turning Fram
 pip install pyinstaller
 ```
 
+For the repository's Windows packaging flow, prefer the dedicated build requirements file:
+
+```text
+release/windows-portable/requirements-windows-build.txt
+```
+
 ## 4. Basic One-file Build
 
 ```bash
@@ -98,13 +104,41 @@ On Windows, replace `:` with `;` in `--add-data`.
 
 Current repository build script already follows this principle by creating a temporary isolated environment named `.build-venv` on Windows before invoking PyInstaller.
 
-## 9. Notes About OpenCV and Models
+## 9. Offline Windows Packaging
+
+To prepare for a Windows machine without internet access:
+
+1. On a machine with internet, run:
+
+```bash
+python scripts/prepare_windows_offline_wheels.py
+```
+
+2. Verify that this directory contains `.whl` files:
+
+```text
+release/windows-portable/wheelhouse/
+```
+
+3. Copy the full repository to the offline Windows machine.
+4. Make sure the offline Windows machine uses Python 3.11 x64.
+5. Run:
+
+```bat
+release\windows-portable\build_windows.bat
+```
+
+The build script will install from the local wheelhouse with `--no-index` before attempting any network access.
+
+## 10. Notes About OpenCV and Models
 
 - OpenCV `dnn_superres` requires a compatible OpenCV build
 - External `.pb` model files are not embedded automatically unless packaged as data
 - If users are expected to download models inside the app, shipping without bundled models is also acceptable
 
-## 10. Release Checklist
+This repository now uses `opencv-contrib-python` so the packaged application keeps `dnn_superres` support.
+
+## 11. Release Checklist
 
 - [ ] `README.md` updated
 - [ ] `README.zh-CN.md` updated
@@ -115,7 +149,7 @@ Current repository build script already follows this principle by creating a tem
 - [ ] packaging tested on target OS
 - [ ] export workflow tested in packaged app
 
-## 11. Future Improvement
+## 12. Future Improvement
 
 If release packaging becomes a regular workflow, consider adding:
 

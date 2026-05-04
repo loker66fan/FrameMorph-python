@@ -16,6 +16,9 @@
 
 ```text
 FrameMorph-python/
+├── .github/
+│   └── workflows/
+│       └── windows-portable-build.yml
 ├── main.py
 ├── core/
 │   ├── crop_controller.py
@@ -39,6 +42,17 @@ FrameMorph-python/
 ├── docs/
 │   ├── TECHNICAL.md
 │   └── USER_GUIDE.md
+├── release/
+│   ├── offline-packages/
+│   ├── windows-build-output/
+│   └── windows-portable/
+│       ├── build_windows.bat
+│       ├── FrameMorph-python.spec
+│       ├── requirements-windows-build.txt
+│       └── wheelhouse/
+├── scripts/
+│   └── prepare_windows_offline_wheels.py
+├── requirements.txt
 └── 方案.md
 ```
 
@@ -49,6 +63,7 @@ FrameMorph-python/
 - 应用入口
 - 创建 `QApplication`
 - 展示主窗口
+- 在 GUI 打包环境下仅当 `sys.stderr` 可用时才启用 `faulthandler`
 
 ### `core/`
 
@@ -86,6 +101,8 @@ FrameMorph-python/
   - 导出预览
   - 模型识别与模型下载入口
   - 导出任务窗口与导出流程编排
+  - `torch` 缺失时自动禁用 `SRCNN`
+  - `dnn_superres` 优先复用本地 `models/opencv_dnn_superres/` 中的模型
 - `transform_view.py`
   - 主画布 `QGraphicsView`
   - 图片显示、覆盖层、拖拽、缩放
@@ -106,6 +123,7 @@ FrameMorph-python/
   - 图像保存
   - 高清增强
   - `dnn_superres` 模型文件识别
+  - `dnn_superres` 运行时依赖 `opencv-contrib-python`
 
 ## 4. 关键数据流
 
@@ -140,7 +158,54 @@ FrameMorph-python/
 
 这部分是当前最重要的性能优化点之一。
 
-## 5. 最近完成的结构优化
+## 5. Windows 打包与离线构建链路
+
+### 5.1 在线打包链路
+
+- GitHub Actions 工作流：`.github/workflows/windows-portable-build.yml`
+- Windows 本地脚本：`release/windows-portable/build_windows.bat`
+- Windows 打包专用依赖清单：`release/windows-portable/requirements-windows-build.txt`
+- PyInstaller 配置：`release/windows-portable/FrameMorph-python.spec`
+
+当前约束：
+
+- 离线 wheel 目标解释器固定为 Python 3.11 x64
+- Windows 打包依赖使用 `opencv-contrib-python`，保证 `dnn_superres` 可用
+- `SRCNN` 不是默认打包能力，因为默认离线依赖包不包含 `torch`
+
+### 5.2 离线打包链路
+
+离线打包支持依赖以下目录和脚本：
+
+- `release/windows-portable/wheelhouse/`
+- `scripts/prepare_windows_offline_wheels.py`
+- `release/offline-packages/`
+
+约定如下：
+
+- `wheelhouse/` 用来存放 Windows 打包所需的离线 `.whl`
+- `build_windows.bat` 会优先从本地 `wheelhouse/` 用 `--no-index` 安装依赖
+- `release/offline-packages/` 用来生成可直接拷到无网 Windows 机器上的离线压缩包
+
+### 5.3 哪些内容应提交到 GitHub
+
+应提交：
+
+- 打包脚本和说明文档
+- `requirements-windows-build.txt`
+- `scripts/prepare_windows_offline_wheels.py`
+- `wheelhouse/README.md`
+- `release/offline-packages/.gitkeep`
+
+不应提交：
+
+- `wheelhouse/` 中实际下载的 `.whl`
+- `release/offline-packages/` 中实际生成的离线 ZIP
+- `release/windows-build-output/` 中实际构建产物
+
+这些二进制内容属于发布或传输产物，不应进入仓库历史。
+
+## 6. 最近完成的结构优化
 
 ### 已完成
 
@@ -149,6 +214,10 @@ FrameMorph-python/
 - 将导出预览改为缩略图增强 + 缓存
 - 增加 `dnn_superres` 模型识别与匹配校验
 - 增加后台导出线程、进度、ETA、取消导出
+- 将运行时 OpenCV 依赖切换为 `opencv-contrib-python`
+- 增加 Windows 离线打包依赖清单与离线 wheel 准备脚本
+- 增加 GUI 打包环境下的 `faulthandler` 兼容处理
+- 在缺少 `torch` 时自动禁用 `SRCNN`
 
 ### 当前仍然偏重的模块
 
@@ -166,15 +235,15 @@ FrameMorph-python/
 - `ui/panels/transform_panel.py`
 - `ui/panels/mesh_panel.py`
 
-## 6. 维护建议
+## 7. 维护建议
 
-### 6.1 新增功能时的放置原则
+### 7.1 新增功能时的放置原则
 
 - 纯算法或图像处理逻辑：优先放 `core/` 或 `utils/`
 - 后台线程和导出/下载支持：放 `ui/export_support.py` 或独立 support 模块
 - 仅界面拼装逻辑：放 `ui/`
 
-### 6.2 修改导出功能时
+### 7.2 修改导出功能时
 
 优先查看：
 
@@ -182,7 +251,7 @@ FrameMorph-python/
 - `ui/export_support.py`
 - `utils/image_utils.py`
 
-### 6.3 修改预览性能时
+### 7.3 修改预览性能时
 
 优先查看：
 
@@ -190,7 +259,7 @@ FrameMorph-python/
 - `scaled_preview_image()`
 - `MeshWarpController._profile()`
 
-### 6.4 修改 `dnn_superres` 时
+### 7.4 修改 `dnn_superres` 时
 
 优先查看：
 
@@ -198,7 +267,16 @@ FrameMorph-python/
 - `infer_dnn_model_metadata()`
 - `enhance_image_dnn_superres()`
 
-## 7. 常见问题定位
+### 7.5 修改 Windows 打包链路时
+
+优先查看：
+
+- `release/windows-portable/build_windows.bat`
+- `release/windows-portable/requirements-windows-build.txt`
+- `.github/workflows/windows-portable-build.yml`
+- `scripts/prepare_windows_offline_wheels.py`
+
+## 8. 常见问题定位
 
 ### 导出预览失败
 
@@ -223,7 +301,16 @@ FrameMorph-python/
 - `main_window.py` 的面板布局
 - 是否能继续拆成子面板模块
 
-## 8. 后续重构建议
+### Windows 打包失败
+
+优先检查：
+
+- 是否使用 Python 3.11 x64
+- `wheelhouse/` 中是否包含 `pefile`、`pywin32-ctypes`、`pywin32`
+- `requirements-windows-build.txt` 是否和打包脚本保持一致
+- 是否误把离线 ZIP 当作仓库源码直接在压缩包内部运行而未完整解压
+
+## 9. 后续重构建议
 
 建议按以下顺序继续演进：
 
