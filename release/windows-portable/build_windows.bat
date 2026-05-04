@@ -3,8 +3,6 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 cd /d %~dp0\..\..
 set "BUILD_ERROR="
-set "VENV_DIR=.build-venv"
-set "VENV_PY=%VENV_DIR%\Scripts\python.exe"
 set "BUILD_REQUIREMENTS=release\windows-portable\requirements-windows-build.txt"
 set "WHEELHOUSE_DIR=release\windows-portable\wheelhouse"
 set "EXPECTED_PYTHON_VERSION=3.11"
@@ -14,6 +12,8 @@ set "BOOTSTRAP_INSTALL_LOG=release\windows-portable\python-runtime-install.log"
 set "BOOTSTRAP_RUNTIME_ABS=%CD%\release\windows-portable\python-runtime"
 set "BOOTSTRAP_INSTALLER_ABS=%CD%\release\windows-portable\python-installer\python-3.11.9-amd64.exe"
 set "PYTHON_CHECK_CMD=import sys; sys.exit(0 if sys.version_info[:2] == (3, 11) else 1)"
+set "VENV_DIR=%TEMP%\FrameMorph-python-build-venv-%RANDOM%%RANDOM%"
+set "VENV_PY=%VENV_DIR%\Scripts\python.exe"
 set "ACTIVE_PYTHON="
 set "ACTIVE_PYTHON_ARGS="
 set "ACTIVE_PYTHON_VERSION="
@@ -36,12 +36,14 @@ if not defined ACTIVE_PYTHON (
 
 where python >nul 2>nul
 if not errorlevel 1 if not defined ACTIVE_PYTHON (
-    python -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+    set "SYSTEM_PYTHON_PATH="
+    for /f "delims=" %%I in ('where python 2^>nul') do if not defined SYSTEM_PYTHON_PATH set "SYSTEM_PYTHON_PATH=%%I"
+    "!SYSTEM_PYTHON_PATH!" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
     if not errorlevel 1 (
-        set "ACTIVE_PYTHON=python"
+        set "ACTIVE_PYTHON="!SYSTEM_PYTHON_PATH!""
         set "ACTIVE_PYTHON_ARGS="
         set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
-        echo Detected Python via python.exe on PATH.
+        echo Detected Python via python.exe on PATH: !SYSTEM_PYTHON_PATH!
     )
 )
 
@@ -172,10 +174,19 @@ echo Using Python: %ACTIVE_PYTHON%
 echo Python version: %ACTIVE_PYTHON_VERSION%
 
 echo [2/7] Preparing isolated build environment...
-if exist %VENV_DIR% rmdir /s /q %VENV_DIR%
-%ACTIVE_PYTHON% %ACTIVE_PYTHON_ARGS% -m venv %VENV_DIR%
+if exist "%VENV_DIR%" rmdir /s /q "%VENV_DIR%"
+%ACTIVE_PYTHON% %ACTIVE_PYTHON_ARGS% -m venv --clear --copies "%VENV_DIR%"
 if errorlevel 1 (
     set "BUILD_ERROR=Failed to create isolated build virtual environment."
+    goto :fail
+)
+if not exist "%VENV_PY%" (
+    set "BUILD_ERROR=Virtual environment was created, but %VENV_PY% was not found."
+    goto :fail
+)
+"%VENV_PY%" -c "import sys; sys.exit(0)" >nul 2>nul
+if errorlevel 1 (
+    set "BUILD_ERROR=Created virtual environment is not runnable. It may be referencing a stale Python launcher."
     goto :fail
 )
 
