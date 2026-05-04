@@ -38,12 +38,43 @@ where python >nul 2>nul
 if not errorlevel 1 if not defined ACTIVE_PYTHON (
     set "SYSTEM_PYTHON_PATH="
     for /f "delims=" %%I in ('where python 2^>nul') do if not defined SYSTEM_PYTHON_PATH set "SYSTEM_PYTHON_PATH=%%I"
-    "!SYSTEM_PYTHON_PATH!" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
-    if not errorlevel 1 (
+    echo Found python.exe on PATH: !SYSTEM_PYTHON_PATH!
+    echo Skipping PATH alias validation and checking direct install locations first...
+)
+
+if not defined ACTIVE_PYTHON (
+    if exist "%LocalAppData%\Programs\Python\Python311\python.exe" (
+        "%LocalAppData%\Programs\Python\Python311\python.exe" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+        if not errorlevel 1 (
+            set "ACTIVE_PYTHON="%LocalAppData%\Programs\Python\Python311\python.exe""
+            set "ACTIVE_PYTHON_ARGS="
+            set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
+            echo Detected Python via default per-user install path.
+        )
+    )
+)
+
+if not defined ACTIVE_PYTHON (
+    if exist "%ProgramFiles%\Python311\python.exe" (
+        "%ProgramFiles%\Python311\python.exe" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+        if not errorlevel 1 (
+            set "ACTIVE_PYTHON="%ProgramFiles%\Python311\python.exe""
+            set "ACTIVE_PYTHON_ARGS="
+            set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
+            echo Detected Python via default all-users install path.
+        )
+    )
+)
+
+if not defined ACTIVE_PYTHON (
+    if defined SYSTEM_PYTHON_PATH (
+        "!SYSTEM_PYTHON_PATH!" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+    )
+    if not errorlevel 1 if defined SYSTEM_PYTHON_PATH (
         set "ACTIVE_PYTHON="!SYSTEM_PYTHON_PATH!""
         set "ACTIVE_PYTHON_ARGS="
         set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
-        echo Detected Python via python.exe on PATH: !SYSTEM_PYTHON_PATH!
+        echo Detected Python via python.exe on PATH.
     )
 )
 
