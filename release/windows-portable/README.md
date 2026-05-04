@@ -73,15 +73,19 @@ The script now:
 - prints output paths on success
 - prints the failure reason on error
 - waits for a key press before closing
-- tries Python in this order: `py -3.11` launcher, `python` on PATH, project-local runtime, Windows registry, bundled installer
-- if Python 3.11 is missing, installs the bundled official offline Python runtime into `release/windows-portable/python-runtime/`
-- writes the installer log to `release/windows-portable/python-runtime-install.log`
-- uses a visible Python installer progress window instead of a fully silent install
-- after installation, searches both the target directory and the default per-user Python 3.11 location for `python.exe`
-- creates an isolated `.build-venv` before packaging to avoid polluted global Python environments
-- checks that the resolved interpreter is Python 3.11, which matches the bundled offline wheels
+- assumes the machine already has a usable Python environment
+- resolves Python in this order: `FRAME_MORPH_PYTHON`, `py -3`, `py`, then a non-WindowsApps `python.exe` on PATH
+- skips bundled Python installation and version-specific detection
+- creates an isolated temporary virtual environment before packaging
 - installs from `release/windows-portable/wheelhouse/` first when local wheel files are present
 - falls back to online installation only when no offline wheelhouse is available
+
+If your machine has multiple Python installs or PATH points to the Microsoft Store alias, set a real interpreter explicitly before running:
+
+```bat
+set FRAME_MORPH_PYTHON=C:\Path\To\python.exe
+release\windows-portable\build_windows.bat
+```
 
 ## Expected Output
 
