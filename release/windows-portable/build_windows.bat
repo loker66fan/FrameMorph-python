@@ -11,6 +11,8 @@ set "EXPECTED_PYTHON_VERSION=3.11"
 set "BOOTSTRAP_INSTALLER=release\windows-portable\python-installer\python-3.11.9-amd64.exe"
 set "BOOTSTRAP_RUNTIME_DIR=release\windows-portable\python-runtime"
 set "BOOTSTRAP_INSTALL_LOG=release\windows-portable\python-runtime-install.log"
+set "BOOTSTRAP_RUNTIME_ABS=%CD%\release\windows-portable\python-runtime"
+set "BOOTSTRAP_INSTALLER_ABS=%CD%\release\windows-portable\python-installer\python-3.11.9-amd64.exe"
 set "ACTIVE_PYTHON="
 set "ACTIVE_PYTHON_ARGS="
 set "ACTIVE_PYTHON_VERSION="
@@ -44,10 +46,10 @@ if not errorlevel 1 if not defined ACTIVE_PYTHON (
 
 if not defined ACTIVE_PYTHON (
     echo PATH lookup did not provide Python %EXPECTED_PYTHON_VERSION%. Checking Python runtime in project directory...
-    if exist "%BOOTSTRAP_RUNTIME_DIR%\python.exe" (
-        for /f %%I in ('"%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "RUNTIME_PYTHON_VERSION=%%I"
+    if exist "%BOOTSTRAP_RUNTIME_ABS%\python.exe" (
+        for /f %%I in ('"%BOOTSTRAP_RUNTIME_ABS%\python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "RUNTIME_PYTHON_VERSION=%%I"
         if "%RUNTIME_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
-            set "ACTIVE_PYTHON="%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe""
+            set "ACTIVE_PYTHON="%BOOTSTRAP_RUNTIME_ABS%\python.exe""
             set "ACTIVE_PYTHON_ARGS="
             set "ACTIVE_PYTHON_VERSION=%RUNTIME_PYTHON_VERSION%"
             echo Reusing bundled local Python runtime.
@@ -57,15 +59,45 @@ if not defined ACTIVE_PYTHON (
 
 if not defined ACTIVE_PYTHON (
     echo Local runtime not found. Checking Windows registry for Python %EXPECTED_PYTHON_VERSION%...
-    call :try_registry_python "HKCU\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath"
+    set "REGISTRY_PATH="
+    for /f "tokens=2,*" %%A in ('reg query "HKCU\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
+    if defined REGISTRY_PATH if exist "%REGISTRY_PATH%python.exe" (
+        for /f %%I in ('"%REGISTRY_PATH%python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "REGISTRY_PYTHON_VERSION=%%I"
+        if "%REGISTRY_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
+            set "ACTIVE_PYTHON="%REGISTRY_PATH%python.exe""
+            set "ACTIVE_PYTHON_ARGS="
+            set "ACTIVE_PYTHON_VERSION=%REGISTRY_PYTHON_VERSION%"
+            echo Detected Python via registry: HKCU\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath
+        )
+    )
 )
 
 if not defined ACTIVE_PYTHON (
-    call :try_registry_python "HKLM\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath"
+    set "REGISTRY_PATH="
+    for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
+    if defined REGISTRY_PATH if exist "%REGISTRY_PATH%python.exe" (
+        for /f %%I in ('"%REGISTRY_PATH%python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "REGISTRY_PYTHON_VERSION=%%I"
+        if "%REGISTRY_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
+            set "ACTIVE_PYTHON="%REGISTRY_PATH%python.exe""
+            set "ACTIVE_PYTHON_ARGS="
+            set "ACTIVE_PYTHON_VERSION=%REGISTRY_PYTHON_VERSION%"
+            echo Detected Python via registry: HKLM\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath
+        )
+    )
 )
 
 if not defined ACTIVE_PYTHON (
-    call :try_registry_python "HKLM\Software\WOW6432Node\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath"
+    set "REGISTRY_PATH="
+    for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\WOW6432Node\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
+    if defined REGISTRY_PATH if exist "%REGISTRY_PATH%python.exe" (
+        for /f %%I in ('"%REGISTRY_PATH%python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "REGISTRY_PYTHON_VERSION=%%I"
+        if "%REGISTRY_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
+            set "ACTIVE_PYTHON="%REGISTRY_PATH%python.exe""
+            set "ACTIVE_PYTHON_ARGS="
+            set "ACTIVE_PYTHON_VERSION=%REGISTRY_PYTHON_VERSION%"
+            echo Detected Python via registry: HKLM\Software\WOW6432Node\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath
+        )
+    )
 )
 
 if not defined ACTIVE_PYTHON (
@@ -77,25 +109,42 @@ if not defined ACTIVE_PYTHON (
     echo Installer: %BOOTSTRAP_INSTALLER%
     echo Install log: %BOOTSTRAP_INSTALL_LOG%
     echo A Python setup progress window should appear. This step may take a few minutes on slower machines.
-    if exist "%BOOTSTRAP_RUNTIME_DIR%" rmdir /s /q "%BOOTSTRAP_RUNTIME_DIR%"
+    if exist "%BOOTSTRAP_RUNTIME_ABS%" rmdir /s /q "%BOOTSTRAP_RUNTIME_ABS%"
     if exist "%BOOTSTRAP_INSTALL_LOG%" del /f /q "%BOOTSTRAP_INSTALL_LOG%"
-    start /wait "" "%CD%\%BOOTSTRAP_INSTALLER%" /passive /log "%CD%\%BOOTSTRAP_INSTALL_LOG%" InstallAllUsers=0 TargetDir="%CD%\%BOOTSTRAP_RUNTIME_DIR%" Include_pip=1 Include_launcher=0 AssociateFiles=0 Shortcuts=0 PrependPath=0 Include_test=0 Include_tcltk=0 Include_doc=0
+    start /wait "" "%BOOTSTRAP_INSTALLER_ABS%" /passive /log "%CD%\%BOOTSTRAP_INSTALL_LOG%" InstallAllUsers=0 "TargetDir=%BOOTSTRAP_RUNTIME_ABS%" Include_pip=1 Include_exe=1 Include_lib=1 Include_dev=1 Include_launcher=0 AssociateFiles=0 Shortcuts=0 PrependPath=0 Include_test=0 Include_tcltk=0 Include_doc=0
     if errorlevel 1 (
         set "BUILD_ERROR=Failed to install bundled Python runtime. See %BOOTSTRAP_INSTALL_LOG%."
         goto :fail
     )
-    if not exist "%BOOTSTRAP_RUNTIME_DIR%\python.exe" (
-        set "BUILD_ERROR=Bundled Python installer completed, but python.exe was not found in %BOOTSTRAP_RUNTIME_DIR%. See %BOOTSTRAP_INSTALL_LOG%."
+
+    set "FOUND_BOOTSTRAP_PYTHON="
+    if exist "%BOOTSTRAP_RUNTIME_ABS%\python.exe" (
+        set "FOUND_BOOTSTRAP_PYTHON=%BOOTSTRAP_RUNTIME_ABS%\python.exe"
+    )
+    if not defined FOUND_BOOTSTRAP_PYTHON (
+        for /r "%BOOTSTRAP_RUNTIME_ABS%" %%F in (python.exe) do (
+            if not defined FOUND_BOOTSTRAP_PYTHON set "FOUND_BOOTSTRAP_PYTHON=%%F"
+        )
+    )
+    if not defined FOUND_BOOTSTRAP_PYTHON (
+        if exist "%LocalAppData%\Programs\Python\Python311\python.exe" (
+            set "FOUND_BOOTSTRAP_PYTHON=%LocalAppData%\Programs\Python\Python311\python.exe"
+        )
+    )
+    if not defined FOUND_BOOTSTRAP_PYTHON (
+        set "BUILD_ERROR=Bundled Python installer completed, but python.exe was not found under %BOOTSTRAP_RUNTIME_DIR% or %%LocalAppData%%\\Programs\\Python\\Python311. See %BOOTSTRAP_INSTALL_LOG%."
         goto :fail
     )
-    for /f %%I in ('"%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "RUNTIME_PYTHON_VERSION=%%I"
+
+    for /f %%I in ('"%FOUND_BOOTSTRAP_PYTHON%" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "RUNTIME_PYTHON_VERSION=%%I"
     if not "%RUNTIME_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
         set "BUILD_ERROR=Bundled Python runtime version mismatch. Expected %EXPECTED_PYTHON_VERSION%, got %RUNTIME_PYTHON_VERSION%."
         goto :fail
     )
-    set "ACTIVE_PYTHON="%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe""
+    set "ACTIVE_PYTHON="%FOUND_BOOTSTRAP_PYTHON%""
     set "ACTIVE_PYTHON_ARGS="
     set "ACTIVE_PYTHON_VERSION=%RUNTIME_PYTHON_VERSION%"
+    echo Installed bundled Python runtime: %FOUND_BOOTSTRAP_PYTHON%
 )
 
 if not exist %BUILD_REQUIREMENTS% (
@@ -216,17 +265,3 @@ echo.
 pause
 endlocal
 exit /b 1
-
-:try_registry_python
-set "REGISTRY_KEY=%~1"
-set "REGISTRY_PATH="
-for /f "tokens=2,*" %%A in ('reg query %REGISTRY_KEY% /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
-if not defined REGISTRY_PATH goto :eof
-if not exist "%REGISTRY_PATH%python.exe" goto :eof
-for /f %%I in ('"%REGISTRY_PATH%python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "REGISTRY_PYTHON_VERSION=%%I"
-if not "%REGISTRY_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" goto :eof
-set "ACTIVE_PYTHON="%REGISTRY_PATH%python.exe""
-set "ACTIVE_PYTHON_ARGS="
-set "ACTIVE_PYTHON_VERSION=%REGISTRY_PYTHON_VERSION%"
-echo Detected Python via registry: %REGISTRY_KEY%
-goto :eof
