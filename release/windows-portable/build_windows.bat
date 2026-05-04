@@ -58,6 +58,56 @@ if not defined ACTIVE_PYTHON (
 )
 
 if not defined ACTIVE_PYTHON (
+    echo Checking Windows registry for Python 3.11 install path...
+    set "REGISTRY_PATH="
+    for /f "tokens=2,*" %%A in ('reg query "HKCU\Software\Python\PythonCore\3.11\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
+    if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
+        set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
+        set "ACTIVE_PYTHON_ARGS="
+        echo Using registry python.exe: !REGISTRY_PATH!python.exe
+    )
+)
+
+if not defined ACTIVE_PYTHON (
+    set "REGISTRY_PATH="
+    for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\Python\PythonCore\3.11\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
+    if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
+        set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
+        set "ACTIVE_PYTHON_ARGS="
+        echo Using registry python.exe: !REGISTRY_PATH!python.exe
+    )
+)
+
+if not defined ACTIVE_PYTHON (
+    set "REGISTRY_PATH="
+    for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\WOW6432Node\Python\PythonCore\3.11\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
+    if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
+        set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
+        set "ACTIVE_PYTHON_ARGS="
+        echo Using registry python.exe: !REGISTRY_PATH!python.exe
+    )
+)
+
+if not defined ACTIVE_PYTHON (
+    echo Searching common Conda/custom locations...
+    for %%F in (
+        "%UserProfile%\miniconda3\python.exe"
+        "%UserProfile%\anaconda3\python.exe"
+        "%LocalAppData%\miniconda3\python.exe"
+        "%LocalAppData%\anaconda3\python.exe"
+        "%ProgramData%\miniconda3\python.exe"
+        "%ProgramData%\anaconda3\python.exe"
+        "%UserProfile%\AppData\Local\Programs\Python\Launcher\python.exe"
+    ) do (
+        if not defined ACTIVE_PYTHON if exist %%~F (
+            set "ACTIVE_PYTHON="%%~F""
+            set "ACTIVE_PYTHON_ARGS="
+            echo Using detected python.exe: %%~F
+        )
+    )
+)
+
+if not defined ACTIVE_PYTHON (
     where python >nul 2>nul
     if not errorlevel 1 (
         set "SYSTEM_PYTHON_PATH="
