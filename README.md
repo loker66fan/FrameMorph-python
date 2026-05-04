@@ -1,92 +1,102 @@
 # FrameMorph-python
 
-A desktop image editing tool built with `PySide6`, `Pillow`, and `OpenCV`.
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](requirements.txt)
+[![UI](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)](README.md)
+[![License](https://img.shields.io/badge/License-MIT-black)](LICENSE)
+[![Windows Portable Build](https://github.com/loker66fan/FrameMorph-python/actions/workflows/windows-portable-build.yml/badge.svg)](https://github.com/loker66fan/FrameMorph-python/actions/workflows/windows-portable-build.yml)
+
+A desktop image editor for practical local workflows, built with `PySide6`, `Pillow`, `OpenCV`, and `NumPy`.
 
 [中文说明 / Chinese README](README.zh-CN.md)
 
-`FrameMorph-python` is the repository project name, and `形绘` is the end-user desktop application name.
+`FrameMorph-python` is the repository name. `形绘` is the desktop application name shown to end users.
 
-It focuses on practical image operations for local workflows:
+## Overview
+
+This project is built for hands-on image editing on a local machine rather than cloud-first or template-heavy workflows.
 
 - crop with fixed ratios or free selection
 - resize, stretch, and rotate
-- mesh warp
-- perspective correction
-- text overlays
+- mesh warp and perspective correction
+- text overlays on the canvas
 - high-resolution export
 - multiple enhancement paths, including OpenCV `dnn_superres`
 
-## Features
+## Screenshots
 
-- Drag-and-drop image loading
-- Persistent right-side control panels with a visible canvas workspace
-- Undo / redo support
-- Real-time preview for mesh warp and perspective transform
-- Export preview before / after enhancement
-- Background export with progress, ETA, and cancel support
-- OpenCV super-resolution model download support
+| Workbench | Mesh Warp | Export Panel |
+| --- | --- | --- |
+| ![Workbench](assets/screenshots/workbench.png) | ![Mesh Warp](assets/screenshots/mesh-warp.png) | ![Export Panel](assets/screenshots/export-panel.png) |
 
-## Tech Stack
+## Quick Start
+
+### Requirements
 
 - Python 3.11+
-- PySide6
-- Pillow
-- OpenCV
-- NumPy
 
-## Project Structure
-
-```text
-FrameMorph-python/
-├── main.py
-├── core/
-├── ui/
-│   ├── main_window.py
-│   ├── export_mixin.py
-│   ├── export_support.py
-│   └── transform_view.py
-├── utils/
-├── docs/
-│   ├── TECHNICAL.md
-│   └── USER_GUIDE.md
-├── assets/
-│   └── screenshots/
-├── models/
-│   └── opencv_dnn_superres/
-├── VERSION
-├── PROJECT_SUMMARY.md
-└── requirements.txt
-```
-
-## Installation
+### Install
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Run
+### Run
 
 ```bash
 python main.py
 ```
 
-## Super-Resolution Support
+## Highlights
 
-The export workflow supports three enhancement routes:
+- Drag-and-drop image loading
+- Persistent right-side control panels with a visible canvas workspace
+- Undo and redo support
+- Real-time preview for mesh warp and perspective transform
+- Export comparison preview before and after enhancement
+- Background export with progress, ETA, and cancel support
+- OpenCV super-resolution model download support
+
+## Enhancement and Export
+
+The export workflow currently supports three enhancement routes:
 
 1. Built-in classic super-resolution enhancement
 2. PyTorch SRCNN with a custom local model path
-3. OpenCV `dnn_superres` with:
-   - EDSR
-   - ESPCN
-   - FSRCNN
-   - LapSRN
+3. OpenCV `dnn_superres`
+
+Supported OpenCV model families:
+
+- EDSR
+- ESPCN
+- FSRCNN
+- LapSRN
 
 The application can:
 
 - auto-detect model type and scale from `.pb` filenames
 - download supported OpenCV models into `models/opencv_dnn_superres/`
 - show export progress with percentage and estimated remaining time
+
+## Repository Layout
+
+```text
+FrameMorph-python/
+├── main.py
+├── core/
+├── ui/
+├── utils/
+├── docs/
+├── assets/
+│   └── screenshots/
+├── models/
+│   └── opencv_dnn_superres/
+├── release/
+│   └── windows-portable/
+├── VERSION
+├── CHANGELOG.md
+├── PROJECT_SUMMARY.md
+└── requirements.txt
+```
 
 ## Documentation
 
@@ -99,20 +109,6 @@ The application can:
 - Project summary: [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - Windows portable build folder: [release/windows-portable](release/windows-portable)
-
-## Screenshots
-
-### Workbench
-
-![Workbench](assets/screenshots/workbench.png)
-
-### Mesh Warp
-
-![Mesh Warp](assets/screenshots/mesh-warp.png)
-
-### Export Panel
-
-![Export Panel](assets/screenshots/export-panel.png)
 
 ## Version
 
