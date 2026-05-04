@@ -1,0 +1,68 @@
+name: Windows Portable Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-portable:
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: |
+          $version = (Get-Content VERSION).Trim()
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Build Windows portable package
+        run: |
+          if (Test-Path build) { Remove-Item build -Recurse -Force }
+          if (Test-Path dist) { Remove-Item dist -Recurse -Force }
+          python -m PyInstaller release/windows-portable/FrameMorph-python.spec --noconfirm
+
+      - name: Archive portable package
+        run: |
+          $zipPath = "dist/FrameMorph-python-windows-portable-${{ steps.version.outputs.value }}.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+          Compress-Archive -Path dist/FrameMorph-python/* -DestinationPath $zipPath
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameMorph-python-windows-portable-${{ steps.version.outputs.value }}
+          path: |
+            dist/FrameMorph-python
+            dist/FrameMorph-python-windows-portable-${{ steps.version.outputs.value }}.zip
+          if-no-files-found: error
+
+      - name: Upload zip to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/FrameMorph-python-windows-portable-${{ steps.version.outputs.value }}.zip
+          generate_release_notes: true

@@ -1,0 +1,124 @@
+# Packaging Guide
+
+## 1. Goal
+
+This document describes a practical baseline packaging workflow for turning FrameMorph-python into a distributable desktop executable for the application `形绘` using PyInstaller.
+
+## 2. Recommended Environment
+
+- Python 3.11+
+- Clean virtual environment
+- Dependencies installed from `requirements.txt`
+
+## 3. Install Packaging Tool
+
+```bash
+pip install pyinstaller
+```
+
+## 4. Basic One-file Build
+
+```bash
+pyinstaller -F -w main.py -n FrameMorph-python
+```
+
+Explanation:
+
+- `-F`
+  - build a single-file executable
+- `-w`
+  - disable console window for GUI mode
+- `-n FrameMorph-python`
+  - set output application name
+
+## 5. Recommended One-folder Build
+
+For debugging and asset inspection, one-folder mode is often easier:
+
+```bash
+pyinstaller -D -w main.py -n FrameMorph-python
+```
+
+## 6. Output Location
+
+PyInstaller outputs to:
+
+- `build/`
+- `dist/`
+
+The final executable is typically under:
+
+```text
+dist/FrameMorph-python/
+```
+
+or in one-file mode:
+
+```text
+dist/FrameMorph-python
+```
+
+## 7. Model Files and Assets
+
+Current repository content includes:
+
+- `models/opencv_dnn_superres/`
+- `assets/screenshots/`
+
+Runtime UI also depends on:
+
+- `PySide6-Fluent-Widgets` (`qfluentwidgets`)
+
+If release builds are expected to include built-in model files, make sure they are copied into the packaged output or downloaded after first launch.
+
+For example, if you want to bundle models, use PyInstaller data arguments such as:
+
+```bash
+pyinstaller -D -w main.py -n FrameMorph-python \
+  --add-data "models:models" \
+  --add-data "assets:assets"
+```
+
+On Windows, replace `:` with `;` in `--add-data`.
+
+## 8. Recommended Packaging Steps
+
+1. Create a clean virtual environment
+2. Install dependencies
+3. Run the app locally
+4. Generate screenshots if needed
+5. Build with PyInstaller
+6. Test:
+   - image loading
+   - mesh warp
+   - perspective transform
+   - text overlay
+   - export
+   - `dnn_superres` model loading
+
+Current repository build script already follows this principle by creating a temporary isolated environment named `.build-venv` on Windows before invoking PyInstaller.
+
+## 9. Notes About OpenCV and Models
+
+- OpenCV `dnn_superres` requires a compatible OpenCV build
+- External `.pb` model files are not embedded automatically unless packaged as data
+- If users are expected to download models inside the app, shipping without bundled models is also acceptable
+
+## 10. Release Checklist
+
+- [ ] `README.md` updated
+- [ ] `README.zh-CN.md` updated
+- [ ] `VERSION` updated
+- [ ] `CHANGELOG.md` updated
+- [ ] `LICENSE` included
+- [ ] screenshots prepared
+- [ ] packaging tested on target OS
+- [ ] export workflow tested in packaged app
+
+## 11. Future Improvement
+
+If release packaging becomes a regular workflow, consider adding:
+
+- a committed `.spec` file
+- a simple build script
+- platform-specific packaging notes for Windows / macOS / Linux
