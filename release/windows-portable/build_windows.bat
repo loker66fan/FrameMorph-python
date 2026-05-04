@@ -13,6 +13,7 @@ set "BOOTSTRAP_RUNTIME_DIR=release\windows-portable\python-runtime"
 set "BOOTSTRAP_INSTALL_LOG=release\windows-portable\python-runtime-install.log"
 set "BOOTSTRAP_RUNTIME_ABS=%CD%\release\windows-portable\python-runtime"
 set "BOOTSTRAP_INSTALLER_ABS=%CD%\release\windows-portable\python-installer\python-3.11.9-amd64.exe"
+set "PYTHON_CHECK_CMD=import sys; sys.exit(0 if sys.version_info[:2] == (3, 11) else 1)"
 set "ACTIVE_PYTHON="
 set "ACTIVE_PYTHON_ARGS="
 set "ACTIVE_PYTHON_VERSION="
@@ -20,13 +21,11 @@ set "ACTIVE_PYTHON_VERSION="
 echo [1/7] Resolving Python runtime...
 where py >nul 2>nul
 if not errorlevel 1 (
-    for /f "tokens=2 delims= " %%I in ('py -%EXPECTED_PYTHON_VERSION% -V 2^>^&1') do (
-        for /f "tokens=1,2 delims=." %%A in ("%%I") do set "PY_LAUNCHER_VERSION=%%A.%%B"
-    )
-    if "!PY_LAUNCHER_VERSION!"=="%EXPECTED_PYTHON_VERSION%" (
+    py -%EXPECTED_PYTHON_VERSION% -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+    if not errorlevel 1 (
         set "ACTIVE_PYTHON=py"
         set "ACTIVE_PYTHON_ARGS=-%EXPECTED_PYTHON_VERSION%"
-        set "ACTIVE_PYTHON_VERSION=!PY_LAUNCHER_VERSION!"
+        set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
         echo Detected Python via py launcher.
     )
 )
@@ -37,13 +36,11 @@ if not defined ACTIVE_PYTHON (
 
 where python >nul 2>nul
 if not errorlevel 1 if not defined ACTIVE_PYTHON (
-    for /f "tokens=2 delims= " %%I in ('python -V 2^>^&1') do (
-        for /f "tokens=1,2 delims=." %%A in ("%%I") do set "SYSTEM_PYTHON_VERSION=%%A.%%B"
-    )
-    if "!SYSTEM_PYTHON_VERSION!"=="%EXPECTED_PYTHON_VERSION%" (
+    python -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+    if not errorlevel 1 (
         set "ACTIVE_PYTHON=python"
         set "ACTIVE_PYTHON_ARGS="
-        set "ACTIVE_PYTHON_VERSION=!SYSTEM_PYTHON_VERSION!"
+        set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
         echo Detected Python via python.exe on PATH.
     )
 )
@@ -51,13 +48,11 @@ if not errorlevel 1 if not defined ACTIVE_PYTHON (
 if not defined ACTIVE_PYTHON (
     echo PATH lookup did not provide Python %EXPECTED_PYTHON_VERSION%. Checking Python runtime in project directory...
     if exist "%BOOTSTRAP_RUNTIME_ABS%\python.exe" (
-        for /f "tokens=2 delims= " %%I in ('"%BOOTSTRAP_RUNTIME_ABS%\python.exe" -V 2^>^&1') do (
-            for /f "tokens=1,2 delims=." %%A in ("%%I") do set "RUNTIME_PYTHON_VERSION=%%A.%%B"
-        )
-        if "!RUNTIME_PYTHON_VERSION!"=="%EXPECTED_PYTHON_VERSION%" (
+        "%BOOTSTRAP_RUNTIME_ABS%\python.exe" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+        if not errorlevel 1 (
             set "ACTIVE_PYTHON="%BOOTSTRAP_RUNTIME_ABS%\python.exe""
             set "ACTIVE_PYTHON_ARGS="
-            set "ACTIVE_PYTHON_VERSION=!RUNTIME_PYTHON_VERSION!"
+            set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
             echo Reusing bundled local Python runtime.
         )
     )
@@ -68,13 +63,11 @@ if not defined ACTIVE_PYTHON (
     set "REGISTRY_PATH="
     for /f "tokens=2,*" %%A in ('reg query "HKCU\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
     if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
-        for /f "tokens=2 delims= " %%I in ('"!REGISTRY_PATH!python.exe" -V 2^>^&1') do (
-            for /f "tokens=1,2 delims=." %%A in ("%%I") do set "REGISTRY_PYTHON_VERSION=%%A.%%B"
-        )
-        if "!REGISTRY_PYTHON_VERSION!"=="%EXPECTED_PYTHON_VERSION%" (
+        "!REGISTRY_PATH!python.exe" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+        if not errorlevel 1 (
             set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
             set "ACTIVE_PYTHON_ARGS="
-            set "ACTIVE_PYTHON_VERSION=!REGISTRY_PYTHON_VERSION!"
+            set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
             echo Detected Python via registry: HKCU\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath
         )
     )
@@ -84,13 +77,11 @@ if not defined ACTIVE_PYTHON (
     set "REGISTRY_PATH="
     for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
     if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
-        for /f "tokens=2 delims= " %%I in ('"!REGISTRY_PATH!python.exe" -V 2^>^&1') do (
-            for /f "tokens=1,2 delims=." %%A in ("%%I") do set "REGISTRY_PYTHON_VERSION=%%A.%%B"
-        )
-        if "!REGISTRY_PYTHON_VERSION!"=="%EXPECTED_PYTHON_VERSION%" (
+        "!REGISTRY_PATH!python.exe" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+        if not errorlevel 1 (
             set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
             set "ACTIVE_PYTHON_ARGS="
-            set "ACTIVE_PYTHON_VERSION=!REGISTRY_PYTHON_VERSION!"
+            set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
             echo Detected Python via registry: HKLM\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath
         )
     )
@@ -100,13 +91,11 @@ if not defined ACTIVE_PYTHON (
     set "REGISTRY_PATH="
     for /f "tokens=2,*" %%A in ('reg query "HKLM\Software\WOW6432Node\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath" /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
     if defined REGISTRY_PATH if exist "!REGISTRY_PATH!python.exe" (
-        for /f "tokens=2 delims= " %%I in ('"!REGISTRY_PATH!python.exe" -V 2^>^&1') do (
-            for /f "tokens=1,2 delims=." %%A in ("%%I") do set "REGISTRY_PYTHON_VERSION=%%A.%%B"
-        )
-        if "!REGISTRY_PYTHON_VERSION!"=="%EXPECTED_PYTHON_VERSION%" (
+        "!REGISTRY_PATH!python.exe" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+        if not errorlevel 1 (
             set "ACTIVE_PYTHON="!REGISTRY_PATH!python.exe""
             set "ACTIVE_PYTHON_ARGS="
-            set "ACTIVE_PYTHON_VERSION=!REGISTRY_PYTHON_VERSION!"
+            set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
             echo Detected Python via registry: HKLM\Software\WOW6432Node\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath
         )
     )
@@ -144,24 +133,36 @@ if not defined ACTIVE_PYTHON (
         )
     )
     if not defined FOUND_BOOTSTRAP_PYTHON (
+        where py >nul 2>nul
+        if not errorlevel 1 (
+            py -%EXPECTED_PYTHON_VERSION% -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+            if not errorlevel 1 (
+                set "ACTIVE_PYTHON=py"
+                set "ACTIVE_PYTHON_ARGS=-%EXPECTED_PYTHON_VERSION%"
+                set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
+                echo Installed bundled Python runtime is now reachable via py launcher.
+            )
+        )
+    )
+    if defined ACTIVE_PYTHON goto :python_ready
+    if not defined FOUND_BOOTSTRAP_PYTHON (
         set "BUILD_ERROR=Bundled Python installer completed, but python.exe was not found under %BOOTSTRAP_RUNTIME_DIR% or %%LocalAppData%%\\Programs\\Python\\Python311. See %BOOTSTRAP_INSTALL_LOG%."
         goto :fail
     )
 
-    for /f "tokens=2 delims= " %%I in ('"!FOUND_BOOTSTRAP_PYTHON!" -V 2^>^&1') do (
-        for /f "tokens=1,2 delims=." %%A in ("%%I") do set "RUNTIME_PYTHON_VERSION=%%A.%%B"
-    )
-    if not "!RUNTIME_PYTHON_VERSION!"=="%EXPECTED_PYTHON_VERSION%" (
+    "!FOUND_BOOTSTRAP_PYTHON!" -c "%PYTHON_CHECK_CMD%" >nul 2>nul
+    if errorlevel 1 (
         echo Installed Python candidate: !FOUND_BOOTSTRAP_PYTHON!
-        set "BUILD_ERROR=Bundled Python runtime version mismatch. Expected %EXPECTED_PYTHON_VERSION%, got !RUNTIME_PYTHON_VERSION!. See %BOOTSTRAP_INSTALL_LOG%."
+        set "BUILD_ERROR=Bundled Python runtime exists but failed the Python 3.11 validation check. See %BOOTSTRAP_INSTALL_LOG%."
         goto :fail
     )
     set "ACTIVE_PYTHON="!FOUND_BOOTSTRAP_PYTHON!""
     set "ACTIVE_PYTHON_ARGS="
-    set "ACTIVE_PYTHON_VERSION=!RUNTIME_PYTHON_VERSION!"
+    set "ACTIVE_PYTHON_VERSION=%EXPECTED_PYTHON_VERSION%"
     echo Installed bundled Python runtime: !FOUND_BOOTSTRAP_PYTHON!
 )
 
+:python_ready
 if not exist %BUILD_REQUIREMENTS% (
     set "BUILD_ERROR=Missing build requirements file: %BUILD_REQUIREMENTS%"
     goto :fail
