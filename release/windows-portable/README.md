@@ -74,7 +74,7 @@ The script now:
 - prints the failure reason on error
 - waits for a key press before closing
 - assumes the machine already has a usable Python environment
-- resolves Python in this order: `FRAME_MORPH_PYTHON`, `py -3`, `py`, then a non-WindowsApps `python.exe` on PATH
+- resolves Python in this order: `FRAME_MORPH_PYTHON`, `py -3`, `py`, common install directories, then a non-WindowsApps `python.exe` on PATH
 - skips bundled Python installation and version-specific detection
 - creates an isolated temporary virtual environment before packaging
 - installs from `release/windows-portable/wheelhouse/` first when local wheel files are present
@@ -86,6 +86,12 @@ If your machine has multiple Python installs or PATH points to the Microsoft Sto
 set FRAME_MORPH_PYTHON=C:\Path\To\python.exe
 release\windows-portable\build_windows.bat
 ```
+
+If you do not set `FRAME_MORPH_PYTHON`, the script will also try to auto-detect a real interpreter under:
+
+- `%LocalAppData%\Programs\Python\Python*`
+- `%ProgramFiles%\Python*`
+- `%ProgramFiles(x86)%\Python*`
 
 ## Expected Output
 

@@ -47,6 +47,17 @@ if not defined ACTIVE_PYTHON (
 )
 
 if not defined ACTIVE_PYTHON (
+    echo Searching common Python install locations...
+    for /d %%D in ("%LocalAppData%\Programs\Python\Python*" "%ProgramFiles%\Python*" "%ProgramFiles(x86)%\Python*") do (
+        if not defined ACTIVE_PYTHON if exist "%%~fD\python.exe" (
+            set "ACTIVE_PYTHON="%%~fD\python.exe""
+            set "ACTIVE_PYTHON_ARGS="
+            echo Using detected python.exe: %%~fD\python.exe
+        )
+    )
+)
+
+if not defined ACTIVE_PYTHON (
     where python >nul 2>nul
     if not errorlevel 1 (
         set "SYSTEM_PYTHON_PATH="
