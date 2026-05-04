@@ -73,6 +73,7 @@ The script now:
 - prints output paths on success
 - prints the failure reason on error
 - waits for a key press before closing
+- tries Python in this order: `py -3.11` launcher, `python` on PATH, project-local runtime, Windows registry, bundled installer
 - if Python 3.11 is missing, installs the bundled official offline Python runtime into `release/windows-portable/python-runtime/`
 - creates an isolated `.build-venv` before packaging to avoid polluted global Python environments
 - checks that the resolved interpreter is Python 3.11, which matches the bundled offline wheels

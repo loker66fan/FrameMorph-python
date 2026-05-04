@@ -11,26 +11,60 @@ set "EXPECTED_PYTHON_VERSION=3.11"
 set "BOOTSTRAP_INSTALLER=release\windows-portable\python-installer\python-3.11.9-amd64.exe"
 set "BOOTSTRAP_RUNTIME_DIR=release\windows-portable\python-runtime"
 set "ACTIVE_PYTHON="
+set "ACTIVE_PYTHON_ARGS="
 set "ACTIVE_PYTHON_VERSION="
 
 echo [1/7] Resolving Python runtime...
-where python >nul 2>nul
+where py >nul 2>nul
 if not errorlevel 1 (
-    for /f %%I in ('python -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "SYSTEM_PYTHON_VERSION=%%I"
-    if "%SYSTEM_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
-        set "ACTIVE_PYTHON=python"
-        set "ACTIVE_PYTHON_VERSION=%SYSTEM_PYTHON_VERSION%"
+    for /f %%I in ('py -%EXPECTED_PYTHON_VERSION% -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "PY_LAUNCHER_VERSION=%%I"
+    if "%PY_LAUNCHER_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
+        set "ACTIVE_PYTHON=py"
+        set "ACTIVE_PYTHON_ARGS=-%EXPECTED_PYTHON_VERSION%"
+        set "ACTIVE_PYTHON_VERSION=%PY_LAUNCHER_VERSION%"
+        echo Detected Python via py launcher.
     )
 )
 
 if not defined ACTIVE_PYTHON (
+    echo py launcher did not provide Python %EXPECTED_PYTHON_VERSION%. Checking python.exe on PATH...
+)
+
+where python >nul 2>nul
+if not errorlevel 1 if not defined ACTIVE_PYTHON (
+    for /f %%I in ('python -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "SYSTEM_PYTHON_VERSION=%%I"
+    if "%SYSTEM_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
+        set "ACTIVE_PYTHON=python"
+        set "ACTIVE_PYTHON_ARGS="
+        set "ACTIVE_PYTHON_VERSION=%SYSTEM_PYTHON_VERSION%"
+        echo Detected Python via python.exe on PATH.
+    )
+)
+
+if not defined ACTIVE_PYTHON (
+    echo PATH lookup did not provide Python %EXPECTED_PYTHON_VERSION%. Checking Python runtime in project directory...
     if exist "%BOOTSTRAP_RUNTIME_DIR%\python.exe" (
         for /f %%I in ('"%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "RUNTIME_PYTHON_VERSION=%%I"
         if "%RUNTIME_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" (
-            set "ACTIVE_PYTHON=%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe"
+            set "ACTIVE_PYTHON="%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe""
+            set "ACTIVE_PYTHON_ARGS="
             set "ACTIVE_PYTHON_VERSION=%RUNTIME_PYTHON_VERSION%"
+            echo Reusing bundled local Python runtime.
         )
     )
+)
+
+if not defined ACTIVE_PYTHON (
+    echo Local runtime not found. Checking Windows registry for Python %EXPECTED_PYTHON_VERSION%...
+    call :try_registry_python "HKCU\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath"
+)
+
+if not defined ACTIVE_PYTHON (
+    call :try_registry_python "HKLM\Software\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath"
+)
+
+if not defined ACTIVE_PYTHON (
+    call :try_registry_python "HKLM\Software\WOW6432Node\Python\PythonCore\%EXPECTED_PYTHON_VERSION%\InstallPath"
 )
 
 if not defined ACTIVE_PYTHON (
@@ -40,7 +74,7 @@ if not defined ACTIVE_PYTHON (
     )
     echo No usable Python %EXPECTED_PYTHON_VERSION% found. Installing bundled local runtime...
     if exist "%BOOTSTRAP_RUNTIME_DIR%" rmdir /s /q "%BOOTSTRAP_RUNTIME_DIR%"
-    "%CD%\%BOOTSTRAP_INSTALLER%" /quiet InstallAllUsers=0 TargetDir="%CD%\%BOOTSTRAP_RUNTIME_DIR%" Include_pip=1 Include_launcher=0 AssociateFiles=0 Shortcuts=0 PrependPath=0 Include_test=0 Include_tcltk=0 Include_doc=0
+    start /wait "" "%CD%\%BOOTSTRAP_INSTALLER%" /quiet InstallAllUsers=0 TargetDir="%CD%\%BOOTSTRAP_RUNTIME_DIR%" Include_pip=1 Include_launcher=0 AssociateFiles=0 Shortcuts=0 PrependPath=0 Include_test=0 Include_tcltk=0 Include_doc=0
     if errorlevel 1 (
         set "BUILD_ERROR=Failed to install bundled Python runtime."
         goto :fail
@@ -54,7 +88,8 @@ if not defined ACTIVE_PYTHON (
         set "BUILD_ERROR=Bundled Python runtime version mismatch. Expected %EXPECTED_PYTHON_VERSION%, got %RUNTIME_PYTHON_VERSION%."
         goto :fail
     )
-    set "ACTIVE_PYTHON=%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe"
+    set "ACTIVE_PYTHON="%CD%\%BOOTSTRAP_RUNTIME_DIR%\python.exe""
+    set "ACTIVE_PYTHON_ARGS="
     set "ACTIVE_PYTHON_VERSION=%RUNTIME_PYTHON_VERSION%"
 )
 
@@ -68,7 +103,7 @@ echo Python version: %ACTIVE_PYTHON_VERSION%
 
 echo [2/7] Preparing isolated build environment...
 if exist %VENV_DIR% rmdir /s /q %VENV_DIR%
-"%ACTIVE_PYTHON%" -m venv %VENV_DIR%
+%ACTIVE_PYTHON% %ACTIVE_PYTHON_ARGS% -m venv %VENV_DIR%
 if errorlevel 1 (
     set "BUILD_ERROR=Failed to create isolated build virtual environment."
     goto :fail
@@ -175,3 +210,17 @@ echo.
 pause
 endlocal
 exit /b 1
+
+:try_registry_python
+set "REGISTRY_KEY=%~1"
+set "REGISTRY_PATH="
+for /f "tokens=2,*" %%A in ('reg query %REGISTRY_KEY% /ve 2^>nul ^| find "REG_SZ"') do set "REGISTRY_PATH=%%B"
+if not defined REGISTRY_PATH goto :eof
+if not exist "%REGISTRY_PATH%python.exe" goto :eof
+for /f %%I in ('"%REGISTRY_PATH%python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do set "REGISTRY_PYTHON_VERSION=%%I"
+if not "%REGISTRY_PYTHON_VERSION%"=="%EXPECTED_PYTHON_VERSION%" goto :eof
+set "ACTIVE_PYTHON="%REGISTRY_PATH%python.exe""
+set "ACTIVE_PYTHON_ARGS="
+set "ACTIVE_PYTHON_VERSION=%REGISTRY_PYTHON_VERSION%"
+echo Detected Python via registry: %REGISTRY_KEY%
+goto :eof
