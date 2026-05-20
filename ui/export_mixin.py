@@ -19,6 +19,7 @@ from qfluentwidgets import (
     TextEdit,
 )
 
+from core.app_settings import ensure_default_output_directory
 from ui.export_support import (
     DNN_SUPERRES_MODEL_SPECS,
     SUPERRES_MODEL_CACHE_DIR,
@@ -159,7 +160,7 @@ class ExportMixin:
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
             "导出图片",
-            "",
+            str(ensure_default_output_directory()),
             "PNG (*.png);;JPEG (*.jpg *.jpeg)",
         )
         if not path:

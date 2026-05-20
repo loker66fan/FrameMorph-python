@@ -23,7 +23,7 @@ Recommended options:
 - `FrameMorph-python.spec`
   - PyInstaller spec file
 - `requirements-windows-build.txt`
-  - pinned Windows build dependency list
+  - Windows packaging dependency list (`requirements.txt` + packaging-only tools)
 - `python-installer/`
   - bundled official offline Python installer location
 - `wheelhouse/`
@@ -123,12 +123,18 @@ The default offline dependency bundle includes the packaging stack for:
 - Pillow
 - NumPy
 - OpenCV contrib
+- PyMuPDF
+- pypdf
+- python-docx
+- openpyxl
 - PyInstaller
 
 When the bundled Python installer is present, the offline package can be used on a Windows machine that has:
 
 - no internet access
 - no Python installed in advance
+
+Some document workbench features still depend on tools that are not Python wheels, such as LibreOffice, Pandoc, Poppler, Tesseract, or FFmpeg. Install them on the target Windows machine when those workflows are required.
 
 PyTorch is intentionally not included in the default wheelhouse because it would make offline transfer much larger.
 

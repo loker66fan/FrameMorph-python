@@ -9,6 +9,7 @@ This document describes a practical baseline packaging workflow for turning Fram
 - Python 3.11+
 - Clean virtual environment
 - Dependencies installed from `requirements.txt`
+- Use `release/windows-portable/requirements-windows-build.txt` only for the Windows packaging flow, since it extends the runtime dependencies with packaging-only tools
 
 ## 3. Install Packaging Tool
 
@@ -75,6 +76,14 @@ Runtime UI also depends on:
 
 - `PySide6-Fluent-Widgets` (`qfluentwidgets`)
 
+Document workflows can also use external command-line tools when present:
+
+- LibreOffice / `soffice`
+- Pandoc
+- Poppler tools such as `pdftoppm` and `pdfinfo`
+- Tesseract OCR
+- FFmpeg
+
 If release builds are expected to include built-in model files, make sure they are copied into the packaged output or downloaded after first launch.
 
 For example, if you want to bundle models, use PyInstaller data arguments such as:
@@ -95,6 +104,10 @@ On Windows, replace `:` with `;` in `--add-data`.
 4. Generate screenshots if needed
 5. Build with PyInstaller
 6. Test:
+   - document workbench startup
+   - settings page startup and output directory display
+   - backend status refresh
+   - at least one document task that only depends on bundled Python libraries
    - image loading
    - mesh warp
    - perspective transform
@@ -156,6 +169,8 @@ This repository now uses `opencv-contrib-python` so the packaged application kee
 - [ ] `LICENSE` included
 - [ ] screenshots prepared
 - [ ] packaging tested on target OS
+- [ ] document workbench smoke-tested in packaged app
+- [ ] settings page smoke-tested in packaged app
 - [ ] export workflow tested in packaged app
 
 ## 12. Future Improvement

@@ -1,14 +1,9 @@
-# Pinned Windows build dependencies used by:
+# Runtime dependencies for the application itself.
+-r ../../requirements.txt
+
+# Packaging-only dependency used by:
 # - release/windows-portable/build_windows.bat
 # - scripts/prepare_windows_offline_wheels.py
-#
-# These packages are intentionally limited to the baseline packaging stack so
-# the wheel bundle stays small enough for offline transfer.
-PySide6==6.11.0
-PySide6-Fluent-Widgets==1.11.2
-Pillow==12.2.0
-opencv-contrib-python==4.13.0.92
-numpy==2.4.4
 pyinstaller>=6.0,<7.0
 
 # Windows-only transitive dependencies that pip may skip when the wheelhouse is

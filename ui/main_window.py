@@ -7,24 +7,23 @@ from PIL import Image
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
-    QListWidgetItem,
+    QProgressDialog,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
-    QSizePolicy,
-    QProgressDialog,
 )
 from qfluentwidgets import (
     BodyLabel,
     CardWidget,
     ColorPickerButton,
     ComboBox,
-    CompactDoubleSpinBox,
     DoubleSpinBox,
     FluentIcon,
     FluentWindow,
@@ -43,9 +42,9 @@ from qfluentwidgets import (
     SubtitleLabel,
     SwitchButton,
     TextEdit,
-    ToolButton,
 )
 
+from core.app_settings import qconfig
 from core.crop_controller import CropController
 from core.history_manager import HistoryManager
 from core.image_model import ImageModel
@@ -53,13 +52,21 @@ from core.mesh_warp_controller import MeshWarpController
 from core.perspective_controller import PerspectiveController
 from core.text_controller import TextOverlay, TextOverlayController
 from core.transform_controller import TransformController
+from ui.document_workbench import DocumentWorkbench
 from ui.export_mixin import ExportMixin
+from ui.settings_page import SettingsPage
 from ui.warp_support import LiveWarpPreviewThread, MeshWarpApplyThread
 from ui.transform_view import ImageGraphicsView
 
 
 class MainWindow(ExportMixin, FluentWindow):
     PANEL_KEYS = ["crop", "transform", "mesh", "perspective", "text", "export"]
+    IMAGE_WORKBENCH_NARROW_BREAKPOINT = 1060
+    IMAGE_WORKBENCH_COMPACT_BREAKPOINT = 1320
+    IMAGE_WORKBENCH_WIDE_MIN_WIDTH = 340
+    IMAGE_WORKBENCH_WIDE_MAX_WIDTH = 460
+    IMAGE_WORKBENCH_COMPACT_MIN_WIDTH = 300
+    IMAGE_WORKBENCH_COMPACT_MAX_WIDTH = 380
 
     def __init__(self) -> None:
         super().__init__()
@@ -95,6 +102,7 @@ class MainWindow(ExportMixin, FluentWindow):
         self.preview_timer = QTimer(self)
         self.preview_timer.setSingleShot(True)
         self.preview_timer.timeout.connect(self._render_live_preview)
+        qconfig.themeChangedFinished.connect(self._apply_panel_styles)
 
         self.view = ImageGraphicsView()
         self.view.set_text_controller(self.text_controller)
@@ -107,26 +115,43 @@ class MainWindow(ExportMixin, FluentWindow):
         self.view.text_drag_started.connect(self._select_text_overlay)
         self.view.text_drag_finished.connect(self._handle_text_drag_finished)
 
-        self.workbench = self._build_workbench()
-        self.workbench.setObjectName("workbench_page")
-        self.addSubInterface(self.workbench, FluentIcon.PHOTO, "工作台")
+        self.document_workbench = DocumentWorkbench()
+        self.document_workbench.setObjectName("document_workbench_page")
+        self.addSubInterface(self.document_workbench, FluentIcon.DOCUMENT, "文档工作台")
 
+        self.image_workbench = self._build_image_workbench()
+        self.image_workbench.setObjectName("image_workbench_page")
+        self.addSubInterface(self.image_workbench, FluentIcon.PHOTO, "图片工作台")
+
+        self.settings_page = SettingsPage()
+        self.settings_page.setObjectName("settings_page")
+        self.addSubInterface(
+            self.settings_page,
+            FluentIcon.SETTING,
+            "设置",
+            position=NavigationItemPosition.BOTTOM,
+        )
+
+        QTimer.singleShot(0, self._update_image_workbench_layout)
         self._update_actions_state()
         self._update_status("等待导入图片。")
 
-    def _build_workbench(self) -> QWidget:
+    def _build_image_workbench(self) -> QWidget:
         page = QWidget()
         layout = QHBoxLayout(page)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
+        self.image_workbench_page = page
+        self.image_workbench_layout = layout
 
         canvas_card = CardWidget()
+        self.canvas_card = canvas_card
         canvas_layout = QVBoxLayout(canvas_card)
         canvas_layout.setContentsMargins(18, 18, 18, 18)
         canvas_layout.setSpacing(12)
 
         title_row = QHBoxLayout()
-        title_row.addWidget(SubtitleLabel("编辑工作台"))
+        title_row.addWidget(SubtitleLabel("图片工作台"))
         title_row.addStretch(1)
         self.open_button = PrimaryPushButton("打开图片")
         self.open_button.clicked.connect(self.open_image_dialog)
@@ -136,7 +161,7 @@ class MainWindow(ExportMixin, FluentWindow):
         title_row.addWidget(self.export_button)
         canvas_layout.addLayout(title_row)
 
-        desc = BodyLabel("左侧导航只切换右侧控制面板，画布始终保持可见。")
+        desc = BodyLabel("左侧一级导航已拆分为文档工作台和图片工作台，这里保留原有图片编辑流程。")
         desc.setWordWrap(True)
         canvas_layout.addWidget(desc)
 
@@ -155,8 +180,8 @@ class MainWindow(ExportMixin, FluentWindow):
         canvas_layout.addWidget(self.view, 1)
 
         self.right_card = CardWidget()
-        self.right_card.setMinimumWidth(340)
-        self.right_card.setMaximumWidth(460)
+        self.right_card.setMinimumWidth(self.IMAGE_WORKBENCH_WIDE_MIN_WIDTH)
+        self.right_card.setMaximumWidth(self.IMAGE_WORKBENCH_WIDE_MAX_WIDTH)
         self.right_card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         right_layout = QVBoxLayout(self.right_card)
         right_layout.setContentsMargins(18, 18, 18, 18)
@@ -188,17 +213,50 @@ class MainWindow(ExportMixin, FluentWindow):
         for key in self.PANEL_KEYS:
             self.panel_stack.addWidget(self.panel_pages[key])
         self.panel_scroll_area = QScrollArea()
+        self.panel_scroll_area.setObjectName("panelScrollArea")
         self.panel_scroll_area.setWidgetResizable(True)
         self.panel_scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-        self.panel_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.panel_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.panel_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.panel_scroll_area.setWidget(self.panel_stack)
+        self.panel_scroll_area.verticalScrollBar().setSingleStep(20)
         right_layout.addWidget(self.panel_scroll_area, 1)
 
         layout.addWidget(canvas_card, 5)
         layout.addWidget(self.right_card, 2)
         self._apply_panel_styles()
+        self._update_image_workbench_layout()
         return page
+
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._update_image_workbench_layout()
+
+    def _update_image_workbench_layout(self) -> None:
+        if not hasattr(self, "image_workbench_page") or not hasattr(self, "image_workbench_layout"):
+            return
+        page_width = self.image_workbench_page.width()
+        if page_width <= 0:
+            return
+
+        layout = self.image_workbench_layout
+        if page_width <= self.IMAGE_WORKBENCH_NARROW_BREAKPOINT:
+            layout.setDirection(QBoxLayout.Direction.TopToBottom)
+            self.right_card.setMinimumWidth(0)
+            self.right_card.setMaximumWidth(16777215)
+            layout.setStretch(0, 3)
+            layout.setStretch(1, 2)
+            return
+
+        layout.setDirection(QBoxLayout.Direction.LeftToRight)
+        if page_width <= self.IMAGE_WORKBENCH_COMPACT_BREAKPOINT:
+            self.right_card.setMinimumWidth(self.IMAGE_WORKBENCH_COMPACT_MIN_WIDTH)
+            self.right_card.setMaximumWidth(self.IMAGE_WORKBENCH_COMPACT_MAX_WIDTH)
+        else:
+            self.right_card.setMinimumWidth(self.IMAGE_WORKBENCH_WIDE_MIN_WIDTH)
+            self.right_card.setMaximumWidth(self.IMAGE_WORKBENCH_WIDE_MAX_WIDTH)
+        layout.setStretch(0, 5)
+        layout.setStretch(1, 2)
 
     def _build_crop_panel(self) -> QWidget:
         page = QWidget()
@@ -425,18 +483,62 @@ class MainWindow(ExportMixin, FluentWindow):
         return layout
 
     def _apply_panel_styles(self) -> None:
-        self.right_card.setStyleSheet(
-            "background-color: #f4f7fb; border: 1px solid #d7dfeb; border-radius: 14px;"
+        dark = qconfig.theme.name == "DARK"
+        right_card_style = (
+            "background-color: #202733; border: 1px solid #384354; border-radius: 14px;"
+            if dark
+            else "background-color: #f4f7fb; border: 1px solid #d7dfeb; border-radius: 14px;"
         )
-        self.panel_scroll_area.setStyleSheet("background: transparent; border: none;")
-        self.status_label.setStyleSheet(
-            "background-color: #eaf2ff; color: #17324d; border: 1px solid #bfd3f2; "
-            "border-radius: 10px; padding: 10px 12px;"
+        status_style = (
+            "background-color: #22354a; color: #edf5ff; border: 1px solid #46698b; border-radius: 10px; padding: 10px 12px;"
+            if dark
+            else "background-color: #eaf2ff; color: #17324d; border: 1px solid #bfd3f2; border-radius: 10px; padding: 10px 12px;"
         )
         hint_style = (
-            "background-color: #fff7e8; color: #5e3b00; border: 1px solid #f0d6a6; "
-            "border-radius: 10px; padding: 8px 10px;"
+            "background-color: #3a3123; color: #f4dfb4; border: 1px solid #7a6540; border-radius: 10px; padding: 8px 10px;"
+            if dark
+            else "background-color: #fff7e8; color: #5e3b00; border: 1px solid #f0d6a6; border-radius: 10px; padding: 8px 10px;"
         )
+
+        self.right_card.setStyleSheet(right_card_style)
+        self.panel_scroll_area.setStyleSheet(
+            """
+            QScrollArea#panelScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollArea#panelScrollArea > QWidget > QWidget {
+                background: transparent;
+            }
+            QScrollBar:vertical {
+                background: transparent;
+                width: 12px;
+                margin: 4px 0 4px 6px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(120, 146, 177, 0.72);
+                min-height: 44px;
+                border-radius: 6px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(88, 118, 153, 0.9);
+            }
+            QScrollBar::handle:vertical:pressed {
+                background: rgba(66, 93, 127, 0.96);
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 0px;
+                background: transparent;
+                border: none;
+            }
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {
+                background: transparent;
+            }
+            """
+        )
+        self.status_label.setStyleSheet(status_style)
         for label in [
             self.mesh_info_label,
             self.perspective_info_label,

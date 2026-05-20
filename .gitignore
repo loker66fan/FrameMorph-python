@@ -28,6 +28,12 @@ release/offline-packages/*
 release/offline-packages/**
 !release/offline-packages/.gitkeep
 
+# App config
+config/
+
+# Local output
+output/
+
 # IDE / editor
 .idea/
 .vscode/
@@ -40,6 +46,7 @@ Thumbs.db
 
 # Local tool state
 .codex
+.claude/
 
 # Runtime caches
 .pytest_cache/
